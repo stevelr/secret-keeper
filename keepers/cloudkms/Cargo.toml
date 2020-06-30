@@ -9,7 +9,7 @@ keywords = ["security","crypto","kms"]
 categories = ["cryptography", "api-bindings"]
 
 [dependencies]
-secret-keeper = { path="../../core" }
+secret-keeper = { version = "0.3", path="../../core" }
 #
 async-trait = "0.1"
 bytes = "0.5"
