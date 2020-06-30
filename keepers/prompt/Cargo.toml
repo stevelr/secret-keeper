@@ -9,7 +9,7 @@ keywords = ["security","crypto"]
 categories = ["cryptography"]
 
 [dependencies]
-secret-keeper = { path="../../core" }
+secret-keeper = { version = "0.3", path="../../core" }
 async-trait = "0.1"
 bytes = "0.5"
 rpassword = { version = "4.0" }
