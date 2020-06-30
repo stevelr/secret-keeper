@@ -1,0 +1,11 @@
+[workspace]
+members = [
+	"core",
+	"keepers/prompt",
+	"keepers/hashivault",
+	"keepers/cloudkms",
+	"test_util",
+	"examples/encrypt-rs",
+]
+
+

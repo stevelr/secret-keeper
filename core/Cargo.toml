@@ -1,0 +1,40 @@
+[package]
+name = "secret-keeper"
+description = "envelope encryption with strong cryptography and key management"
+version = "0.3.0"
+authors = ["stevelr <git@somecool.net>"]
+edition = "2018"
+
+[dependencies]
+aead = "0.3"
+aes-gcm = { version = "0.6", features = [ "heapless"] }
+async-trait = "0.1"
+bech32 = "0.7"
+bytes = "0.5"
+chacha20poly1305 = "0.5"
+getrandom = "0.1"
+hex = "0.4"
+hmac = "0.8"
+lazy_static = "1.4"
+lz-fear = "0.1"
+pbkdf2 = "0.4"
+serde = {version = "1.0", features = ["derive"]}
+serde_urlencoded = "0.6"
+sha2 = "0.9"
+strum = "0.18"
+strum_macros = "0.18"
+thiserror = "1.0"
+tokio = { version = "0.2", features = ["fs", "io-util", "macros", "rt-core", "sync"] }
+typenum = "1.12"
+url = "2.1"
+zeroize = { version = "1.1", features = [ "zeroize_derive"]}
+
+[dev-dependencies]
+bincode = "1.2"
+mktemp = "0.4"
+random-fast-rng = "0.1"
+secret-keeper-test_util = { path="../test_util"}
+
+#[lib]
+#crate-type = ["cdylib", "rlib"]
+

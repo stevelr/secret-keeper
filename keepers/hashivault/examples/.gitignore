@@ -1,0 +1,4 @@
+*.log
+*.env
+volumes
+scripts/cleanup.sh

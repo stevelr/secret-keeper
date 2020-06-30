@@ -1,0 +1,24 @@
+# hashicorp vault in server mode with file storage backend
+# Use official images from Hashicorp
+
+version: '3.6'
+services:
+  vault:
+    image: vault:1.4.2
+    container_name: vault
+    ports:
+      - "127.0.0.1:8200:8200"
+    restart: always
+    volumes:
+      - ./volumes/config:/vault/config:ro
+      - ./volumes/data:/vault/data
+      - ./volumes/logs:/vault/logs
+      - ./volumes/policies:/vault/policies:ro
+    environment:
+      - VAULT_ADDR=http://127.0.0.1:8200
+      - VAULT_API_ADDR=http://127.0.0.1:8200
+    cap_add:
+      # IPC_LOCK to avoid being swapped to disk
+      - IPC_LOCK
+    # the vault-file uses file storage as backend
+    entrypoint: vault server -config=/vault/config/vault-file.json
