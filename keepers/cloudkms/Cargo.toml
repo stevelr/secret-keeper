@@ -4,6 +4,9 @@ description = "CloudKMS SecretKeeper, an integration with Google Cloud KMS for h
 version = "0.3.0"
 authors = ["stevelr <git@somecool.net>"]
 edition = "2018"
+license = "MIT or Apache-2.0"
+keywords = ["security","crypto","kms"]
+categories = ["cryptography", "API bindings"]
 
 [dependencies]
 secret-keeper = { path="../../core" }
