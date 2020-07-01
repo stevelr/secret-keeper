@@ -104,13 +104,11 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Error> {
-    // register keeper plugins
+    // register keeper plugins (cloudkms initialized later...)
     #[cfg(feature = "hashivault")]
     HashivaultKeeper::new_default().await?.register().await?;
     #[cfg(feature = "prompt")]
     PromptKeeper::new_default().register().await?;
-    #[cfg(feature = "cloudkms")]
-    CloudKmsKeeper::new_default().await?.register().await?;
 
     let args = Main::parse();
     match args.command {
@@ -145,6 +143,8 @@ impl From<std::io::Error> for Error {
 
 /// Encrypt file.
 pub(crate) async fn encrypt_file(opt: &EncryptOptions) -> Result<(), Error> {
+    #[cfg(feature = "cloudkms")]
+    deferred_init_cloudkms(&opt.keeper_uri).await?;
     let keeper = SecretKeeper::for_uri(&opt.keeper_uri.clone()).await?;
     // create file nonce and use it to seed cipher key
     let mut file_nonce = [0u8; FILE_NONCEBYTES];
@@ -204,6 +204,8 @@ async fn load_header(file: &mut File) -> Result<(EncHeader, WrappedKey), Error> 
 
 /// Decrypt file
 pub(crate) async fn decrypt_file(opt: &DecryptOptions) -> Result<(), Error> {
+    #[cfg(feature = "cloudkms")]
+    deferred_init_cloudkms(&opt.keeper_uri).await?;
     let mut file = File::open(&opt.file).await?;
     let (header, wkey) = load_header(&mut file).await?;
     let file_size = file.metadata().await?.len();
@@ -226,6 +228,17 @@ async fn view_key(opt: &ViewKeyOptions) -> Result<(), Error> {
     let (_, envelope) = load_header(&mut file).await?;
 
     println!("{:#?}", envelope);
+    Ok(())
+}
+
+// Only try to register CloudKmsKeeper if it's a compiled feature _and_ the uri schema
+// requests it. That should improve the user experience by preventing the
+// missing-GOOGLE*-env-variable error from appearing for users that don't need it,
+// but still compile it into the default build to make it easier for users that do need it.
+async fn deferred_init_cloudkms(uri: &str) -> Result<(), Error> {
+    if uri.starts_with("cloudkms:") {
+        CloudKmsKeeper::new_default().await?.register().await?;
+    }
     Ok(())
 }
 
