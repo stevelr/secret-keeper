@@ -41,6 +41,7 @@ const URI_SCHEME: &str = "cloudkms";
 const CLOUDKMS_ENDPOINT: &str = "https://cloudkms.googleapis.com";
 const CLOUDKMS_DOMAIN: &str = "cloudkms.googleapis.com";
 
+/// SecretKeeper implementation that uses Google Cloud KMS for key storage
 pub struct CloudKmsKeeper {
     token: Token,
 }
@@ -61,6 +62,7 @@ impl fmt::Debug for CloudKmsKeeper {
     }
 }
 
+/// Options for initializing CloudKmsKeeper.Currently there are no options.
 pub struct CloudKmsOptions {}
 
 impl CloudKmsOptions {

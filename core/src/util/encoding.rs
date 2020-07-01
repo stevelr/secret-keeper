@@ -3,14 +3,17 @@ use bech32::{self, FromBase32, ToBase32};
 use bytes::Bytes;
 use std::fmt;
 
-const KEY_PREFIX: &str = "lv";
+/// All secret-keeper wrapped keys begin with this prefix
+const KEY_PREFIX: &str = "sk";
 
+/// Types convertible to bech32-encoded string
 pub trait ToBech32 {
     fn to_bech32(&self) -> String;
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
+/// Bech32-encoded String that can be decoded into Vector
 pub trait FromBech32 {
     fn from_bech32(&self) -> Result<Vec<u8>, Error>;
 }

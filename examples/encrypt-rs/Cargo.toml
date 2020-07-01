@@ -1,7 +1,7 @@
 [package]
 name = "encrypt-rs"
 description = "command-line envelope encryption with secret-keepers"
-version = "0.3.1"
+version = "0.3.3"
 authors = ["stevelr <git@somecool.net>"]
 edition = "2018"
 repository = "https://github.com/stevelr/secret-keeper/tree/master/examples/encrypt-rs"
@@ -38,3 +38,4 @@ hex = "0.4"
 [[bin]]
 path = "src/main.rs"
 name = "encrypt"
+doc = false

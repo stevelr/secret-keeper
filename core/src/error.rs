@@ -6,7 +6,7 @@ use getrandom;
 pub use std::result::Result;
 use strum;
 use thiserror::Error as ThisError;
-pub type GenericError = Box<dyn std::error::Error + Send + Sync>;
+type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Error enum that rolls-up all error messages in this crate
 #[derive(Debug, ThisError)]

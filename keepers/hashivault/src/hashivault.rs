@@ -32,10 +32,10 @@ use serde_urlencoded;
 use std::env;
 
 /// HashivaultKeeper - hashicorp vault
-///
 #[derive(Debug)]
 pub struct HashivaultKeeper {}
 
+/// Options for initializing HashivaultKeeper
 pub struct HashivaultOptions<'s> {
     /// If the vault token is periodic, the server can auto-renew the token
     /// at the time keeper is constructed. It does not auto-renew during runtime,

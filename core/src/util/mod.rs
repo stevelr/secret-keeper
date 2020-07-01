@@ -5,9 +5,7 @@ mod encoding;
 pub use encoding::{FromBech32, ToBech32};
 
 mod util;
-pub use util::{
-    copy_buf, form_get, getenv, getenv_default, uninitialized_bytes, uninitialized_vec,
-};
+pub use util::{form_get, getenv, getenv_default, uninitialized_bytes, uninitialized_vec};
 
 #[cfg(test)]
 mod test_comp;

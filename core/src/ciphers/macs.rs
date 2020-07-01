@@ -43,9 +43,10 @@ pub mod macros {
         };
     }
 
-    /// This macro used by SecretKeeper implementations.
-    /// It provides a `struct KeyBox` containing sized key and nonce arrays.
-    /// See [`xchacha20`](../ciphers/xchacha20/index.html) for an implementation example
+    /// This macro, used by Cipher implementations,
+    /// provides a `struct KeyBox` containing sized key and nonce arrays.
+    /// See [cipher implementations](https://github.com/stevelr/secret-keeper/tree/master/core/src/ciphers)
+    /// for implementation examples
     #[macro_export]
     macro_rules! cipher_keybox {
         ($lifetm: lifetime,

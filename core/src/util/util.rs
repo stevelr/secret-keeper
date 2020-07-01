@@ -1,7 +1,7 @@
 // src/util.rs
 
 use crate::error::Error;
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::BytesMut;
 
 /// Create a vector of specific size with uninitialized data.
 /// This should only be used if the vector will be
@@ -10,7 +10,6 @@ use bytes::{Buf, BufMut, BytesMut};
 /// use secret_keeper::util::uninitialized_vec;
 /// assert_eq!(uninitialized_vec(3).len(), 3);
 /// ```
-#[inline]
 pub fn uninitialized_vec(sz: usize) -> Vec<u8> {
     let mut v: Vec<u8> = Vec::with_capacity(sz);
     unsafe {
@@ -29,8 +28,6 @@ pub fn uninitialized_vec(sz: usize) -> Vec<u8> {
 /// use secret_keeper::util::uninitialized_bytes;
 /// assert_eq!(uninitialized_bytes(3).len(), 3);
 /// ```
-#[inline]
-#[inline]
 pub fn uninitialized_bytes(sz: usize) -> BytesMut {
     let mut buf = BytesMut::with_capacity(sz);
     unsafe {
@@ -47,7 +44,7 @@ pub fn getenv(key: &str) -> Result<String, Error> {
     std::env::var(key).map_err(|_| Error::OtherError(format!("Undefined environment var: {}", key)))
 }
 
-/// retrieve environment variable, with default vaule
+/// retrieve environment variable, with default value
 pub fn getenv_default(key: &str, default_val: &str) -> String {
     match std::env::var(key) {
         Ok(v) => v,
@@ -55,6 +52,7 @@ pub fn getenv_default(key: &str, default_val: &str) -> String {
     }
 }
 
+/*
 /// copies from reader to writer. Differs from std::io::copy in the following ways:
 /// - asynchronous, with traits Buf & BufMut that support AsyncRead,AsyncWrite
 /// - reader parameter is not mut !
@@ -74,6 +72,7 @@ where
     }
     written as u64
 }
+*/
 
 /// parse the list of key-value tuples to find the value associated with the given key.
 /// This is useful for parsing the results of `serde_urlencoded::from_str`.
@@ -93,9 +92,8 @@ pub fn form_get<'v>(fields: &'v Vec<(String, String)>, key: &str) -> Option<&'v 
 #[cfg(test)]
 mod test {
 
-    use super::*;
     use bytes::Bytes;
-    use secret_keeper_test_util::{arrays_eq, random_bytes};
+    use secret_keeper_test_util::random_bytes;
 
     #[test]
     fn gen_random() {
@@ -110,6 +108,7 @@ mod test {
         assert!(nonzero.len() > 0);
     }
 
+    /*
     #[tokio::test]
     async fn copy_short() {
         const SRC_SIZE: usize = 10;
@@ -134,4 +133,5 @@ mod test {
         assert_eq!(dest.len() as u64, n);
         assert!(arrays_eq(&srcb, &dest));
     }
+    */
 }

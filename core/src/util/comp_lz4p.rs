@@ -7,6 +7,7 @@ use lz_fear::raw; //framed::{CompressionSettings, LZ4FrameReader};
 use std::io::{self, Error as IOError, ErrorKind, Write};
 use std::marker::Unpin;
 
+/// Compress data read from file or in byte arrays
 #[derive(Debug)]
 pub struct Compressor {}
 
@@ -64,6 +65,7 @@ impl<'w> Write for CompWriter<'w> {
     }
 }
 
+/// Uncompress data
 #[derive(Debug)]
 pub struct Uncompressor {}
 
