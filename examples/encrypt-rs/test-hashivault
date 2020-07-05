@@ -1,0 +1,53 @@
+#!/bin/sh
+set -e
+
+# test "encrypt" binary with hashivault key.
+
+# file to encrypt is first parameter, otherwise "/etc/services" is used
+TEST_FILE=${1:-/etc/services}
+
+# Environment variables
+# Required
+#     VAULT_TOKEN must be set in environment
+# Optional
+#     VAULT_ADDR  vault server, default "http://127.0.0.1:8200/"
+#     KEY_TYPE    optional key type, default "aes256-gcm96"
+#     KEY_NAME    transit key name, default "my-key"
+#     PROG        path to 'encrypt' binary, or will find it in $PATH
+
+[ -z "$VAULT_TOKEN" ] && echo "VAULT_TOKEN must be defined" && exit 1
+VAULT_ADDR=${VAULT_ADDR:-"http://127.0.0.1:8200/"}
+KEY_TYPE=${KEY_TYPE:-"aes256-gcm96"}
+KEY_NAME=${KEY_NAME:-"my-key"}
+PROG=${PROG:-$(command -v encrypt)}
+
+# enable transit secret engine
+echo "Enabling transit secrets engine"
+curl -s --header "X-Vault-Token: $VAULT_TOKEN" --data '{"type":"transit"}' "$VAULT_ADDR/v1/sys/mounts/transit"
+
+# create key 'my-key' for AES-GCM 256-bit encryption
+echo "Creating key $KEY_NAME"
+curl -X POST  \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  --data "{\"type\":\"$KEY_TYPE\",\"exportable\":false,\"allow_plaintext_backup\":false}" \
+  ${VAULT_ADDR}v1/transit/keys/$KEY_NAME
+
+
+# temp file for encrypted output
+TMP_ENC=$(mktemp)_enc
+# temp file for decrypted output
+TMP_DEC=$(mktemp)_dec
+
+# encrypt 
+$PROG enc -k "hashivault://$KEY_NAME" -o $TMP_ENC $TEST_FILE
+
+# decrypt
+$PROG dec -k "hashivault://$KEY_NAME" -o $TMP_DEC $TMP_ENC
+
+if [ ! $(cmp $TEST_FILE $TMP_DEC) ]; then
+  echo "encrypt-decrypt with hashivault: Success!"
+else
+  echo "encrypt-decrypt with hashivault: ERROR"
+fi
+ls -l $TEST_FILE $TMP_ENC $TMP_DEC
+

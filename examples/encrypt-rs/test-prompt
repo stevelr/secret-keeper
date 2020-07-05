@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+# test "encrypt" binary with prompt keeper
+
+# file to encrypt is first parameter, otherwise "/etc/services" is used
+TEST_FILE=${1:-/etc/services}
+
+# Optional environment variable
+#     PROG   - name of executable. If not defined, 'encrypt' in $PATH
+PROG=${PROG:-$(command -v encrypt)}
+
+# temp file for encrypted output
+TMP_ENC=$(mktemp)_enc
+# temp file for decrypted output
+TMP_DEC=$(mktemp)_dec
+
+# encrypt 
+$PROG enc -k "prompt:" -o $TMP_ENC $TEST_FILE
+
+# decrypt
+$PROG dec -k "prompt:" -o $TMP_DEC $TMP_ENC
+
+if [ ! $(cmp $TEST_FILE $TMP_DEC) ]; then
+  echo "encrypt-decrypt with prompt: Success!"
+else
+  echo "encrypt-decrypt with prompt: ERROR"
+fi
+ls -l $TEST_FILE $TMP_ENC $TMP_DEC
+

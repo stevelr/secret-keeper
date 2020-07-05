@@ -1,0 +1,35 @@
+#!/bin/sh
+set -e
+
+# test "encrypt" binary with environment keeper
+
+# file to encrypt is first parameter, otherwise "/etc/services" is used
+TEST_FILE=${1:-/etc/services}
+
+
+# Optional environment variables
+# VAULT_PASSWORD is a passphrase that will be used to define key
+#                If not defined, the phrase below is used
+# PROG           path to 'encrypt' binary, or will find it in $PATH
+
+export VAULT_PASSWORD=${VAULT_PASSWORD:-"my-super-secret-passphrase"}
+PROG=${PROG:-$(command -v encrypt)}
+
+# temp file for encrypted output
+TMP_ENC=$(mktemp)_enc
+# temp file for decrypted output
+TMP_DEC=$(mktemp)_dec
+
+# encrypt 
+$PROG enc -k "env:" -o $TMP_ENC $TEST_FILE
+
+# decrypt
+$PROG dec -k "env:" -o $TMP_DEC $TMP_ENC
+
+if [ ! $(cmp $TEST_FILE $TMP_DEC) ]; then
+  echo "encrypt-decrypt with env: Success!"
+else
+  echo "encrypt-decrypt with env: ERROR"
+fi
+ls -l $TEST_FILE $TMP_ENC $TMP_DEC
+
