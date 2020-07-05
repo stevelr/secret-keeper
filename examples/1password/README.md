@@ -1,6 +1,6 @@
 # Using keys in 1password with the 'env:' secret-keeper
 
-This script shows how you can 1password with the env keeper.
+This script shows how to use 1password with the env keeper.
 (linux or macos)
 
 You'll need the 1password 
@@ -34,9 +34,8 @@ Edit "signin.sh" and set MY_ACCT_NAME to the account name at 1password.
 ```
 
 The encrypt-rs tool (used in the example above) doesn't use the item's
-password to encryp the file directly - it derives a secure key, using a
+password to encrypt the file directly - it derives a secure key, using a
 key derivation function PBKDF2-HMAC-SHA256 to create the encryption key.
-xjis4ebvyqeeydt6mbqqutlobexjis4ebvyqeeydt6mbqqutlobe
 
 The default cipher used by the encrypt tool also uses lz4 compression,
 so the encrypted size may be smaller than the original. (If the file was
