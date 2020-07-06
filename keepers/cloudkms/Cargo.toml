@@ -8,6 +8,7 @@ license = "Apache-2.0 OR MIT"
 keywords = ["security","crypto","kms"]
 categories = ["cryptography", "api-bindings"]
 repository = "https://github.com/stevelr/secret-keeper/tree/master/keepers/cloudkms"
+readme = "README.md"
 
 [dependencies]
 secret-keeper = { version = "0.3", path="../../core" }
