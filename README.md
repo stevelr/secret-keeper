@@ -61,3 +61,38 @@ I'll link to it from here.
 The core secret-keeper library compiles into wasm without error,
 but I haven't tested it in a browser yet.
 
+## Building and Testing
+
+This crate contains sub-crates for the core
+library, optional secret keeper implementations,
+and a command-line encrypt program
+(examples/encrypt-rs). You can build everything with `cargo build`.
+
+The `examples/encrypt-rs` folder contains some test shell scripts 
+for running the `encrypt` cli program with various secret keepers.
+The binary can be installed separately with `cargo install encrypt-rs`.
+
+### Testing hashivault
+
+To run hashivault tests, you will need an installed instance of
+hashiorp vault. There are two easy ways to create one for test
+purposes (requires docker):
+ 
+  - To set up and iniitalize a vault instance, run
+`examples/hashivault/scripts/create-vault-docker.sh` and 
+`examples/hashivault/scripts/make-app-token.sh`, then `source
+examples/hashivault/secret.env` to set the VAULT_TOKEN environment
+variable. You should be able to run `cargo test hashivault` to run hashivault
+keeper tests. 
+
+  - Install `drone-cli`, the command-line interface, and run 
+`drone exec --trusted --pipeline full`. This command will run CI tests
+on a local docker instance.
+
+See keepers/hashivault/README.md for more information.
+
+### Testing cloudkms
+
+See keepers/cloudkms/README.md for instructions on testing the cloudkms
+keeper.
+
