@@ -55,6 +55,9 @@ implemented by
  - `LZ4XChaCha20Poly1305` (aliases: `lz4`, `lz4xchacha20`, `lz4xchacha20poly1305`)
  - `AesGcm256` (aliases: `aes`, `aesgcm`, `aesgcm256`)
 
+
+_There are some additional usage examples in the test* shell scripts._
+
 ### Random number generation
 
 File nonces and keys are generated with the platform's OS CSRNG,
