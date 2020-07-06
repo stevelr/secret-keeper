@@ -55,7 +55,7 @@ async fn hashivault_wrap_unwrap() -> Result<(), Error> {
     let token = test_getenv()?;
     let rand_key = format!("test_key_{}", hex::encode(random_bytes(4)));
 
-    let uri = format!("hashivault://localhost:8200/{}?token={}", rand_key, token);
+    let uri = format!("hashivault://{}?token={}", rand_key, token);
     let keeper = HashivaultKeeper::new(HashivaultOptions::defaults()).await?;
 
     let key = random_bytes(32);
@@ -78,10 +78,7 @@ async fn hashivault_encrypt_decrypt() -> Result<(), Error> {
     let key_type = getenv_default(KEYTYPE_ENV, "aes256-gcm96");
     let rand_key = format!("test_key_{}", hex::encode(random_bytes(5)));
 
-    let spec = ClientSpec::from_uri(&format!(
-        "hashivault://localhost:8200/{}?token={}",
-        rand_key, token
-    ))?;
+    let spec = ClientSpec::from_uri(&format!("hashivault://{}?token={}", rand_key, token))?;
     let _ = create_key(&spec, &key_type).await?;
 
     let plaintext: &[u8] = "Your base are encrypted".as_bytes();
@@ -93,12 +90,23 @@ async fn hashivault_encrypt_decrypt() -> Result<(), Error> {
     Ok(())
 }
 
+fn remove_trailing_slash(s: &str) -> &str {
+    if s.ends_with("/") {
+        &s[..(s.len() - 1)]
+    } else {
+        s
+    }
+}
+
 #[test]
 /// test url parsing: extract host, port, key, inferred scheme
 fn hashivault_uri_parse() -> Result<(), Error> {
     let _guard = TOKEN.lock();
     let spec = ClientSpec::from_uri("hashivault://mykey?token=123")?;
-    assert_eq!(spec.base_url, "http://127.0.0.1:8200");
+    let vault_addr = getenv_default("VAULT_ADDR", "http://127.0.0.1:8200");
+    let addr = remove_trailing_slash(&vault_addr);
+
+    assert_eq!(spec.base_url, addr);
     assert_eq!(spec.key_name, "mykey");
     assert_eq!(spec.token, "123");
 
@@ -123,10 +131,12 @@ fn hashivault_uri_parse() -> Result<(), Error> {
 /// test url parsing: host, port
 fn hashivault_uri_hostport() -> Result<(), Error> {
     let spec = ClientSpec::from_uri("hashivault://mykey?token=123")?;
+    let vault_addr = getenv_default("VAULT_ADDR", "http://127.0.0.1:8200");
+    let addr = remove_trailing_slash(&vault_addr);
     assert_eq!(
-        spec.base_url, "http://127.0.0.1:8200",
+        spec.base_url, addr,
         "default host+port: got base url {}, expected {}",
-        spec.base_url, "http://127.0.0.1:8200"
+        spec.base_url, addr
     );
 
     let spec = ClientSpec::from_uri("hashivault://server:1234/mykey?token=123")?;
