@@ -14,8 +14,9 @@ const PROMPT_VAULT_PASS: &str = "Vault Password: ";
 const PROMPT_CONFIRM: &str = "Confirm: ";
 
 /// PromptKeeper
-/// Uses secret passphrase defined in environment.
-/// Default variable name is "VAULT_PASSWORD"
+/// Prompts user on console terminal for password.
+/// When encrypting (e.g., key creation), user is prompted twice and
+/// operation does not proceed if passwords are not equal.
 #[derive(Debug)]
 pub struct PromptKeeper {}
 
@@ -79,10 +80,4 @@ impl SecretKeeper for PromptKeeper {
         let mut encrypted = (&wk.key_enc).from_bech32()?;
         key_cipher.open(&mut encrypted, None).await
     }
-}
-
-#[cfg(test)]
-mod test {
-
-    // TODO: where are the tests???
 }
