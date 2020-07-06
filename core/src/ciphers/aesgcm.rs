@@ -1,4 +1,5 @@
 /// Cipher implementation of AES-GCM (Galois/Counter Mode) with 256-bit keys
+/// and HMAC authentication
 pub mod aesgcm256 {
 
     // `RUSTFLAGS="-Ctarget-cpu=sandybridge -Ctarget-feature=+aes,+sse2,+sse4.1,+ssse3"`
@@ -26,9 +27,9 @@ pub mod aesgcm256 {
 
     /// Number of bytes in encryption key for AES_GCM (256 bits = 32 bytes)
     pub const KEYBYTES: usize = 32;
-    /// Number of bytes in nonce (96 bites = 12 bytes)
+    /// Number of bytes in nonce (96 bits = 12 bytes)
     pub const NONCEBYTES: usize = 12;
-    /// Number of bytes in auth integrity tag
+    /// Number of bytes in authentication tag
     pub const TAGBYTES: usize = 16;
 
     type PKey = GenericArray<u8, U32>;
@@ -55,8 +56,8 @@ pub mod aesgcm256 {
     /// with optional architecture-specific hardware acceleration
     /// encryption implemented by [RustCrypto](htttps://github.com/RustCrypto/AEADs)
     ///
-    /// When targeting modern x86/x86_64 CPUs, use the following `RUSTFLAGS` to
-    /// take advantage of high performance AES-NI and CLMUL CPU intrinsics:
+    /// See link above for compiler settings (RUSTFLAGS) to enable processor-specific
+    /// optimizations.
     pub struct AesGcm256 {
         kbox: KeyBox,
         aesgcm: Aes256Gcm,
