@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Delete keys in transit engine
+set -e
+
+usage() {
+	echo "Delete key(s) in the vault transit engine"
+	echo "Syntax:"
+	echo "  vault-del-key KEY_NAME [ ... ]"
+	echo ""
+	echo "Requires: VAULT_TOKEN and VAULT_ADDR"
+	echo "   VAULT_ADDR defaults to http://127.0.0.1:8200"
+}
+
+if [ -z "$1" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+	usage && exit 1
+fi
+if [ -z "$VAULT_TOKEN" ]; then
+	echo "VAULT_TOKEN must be set"
+	usage && exit 1
+fi
+VAULT_ADDR=${VAULT_ADDR:-http://127.0.0.1:8200/}
+
+del_key() {
+  local KEY_NAME=$1
+
+  # enable deletion, then delete it
+  curl -sS -XPOST \
+    --header "X-Vault-Token: $VAULT_TOKEN" \
+    --data "{\"deletion_allowed\":true}" \
+    ${VAULT_ADDR}v1/transit/keys/$KEY_NAME/config
+
+  curl -sS -XDELETE  \
+	--header "X-Vault-Token: $VAULT_TOKEN" \
+	${VAULT_ADDR}v1/transit/keys/$KEY_NAME
+}
+
+while [ $# -ne 0 ]; do
+	echo Deleting key $1
+	del_key $1
+	shift
+done

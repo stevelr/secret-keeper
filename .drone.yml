@@ -1,0 +1,96 @@
+# 'default' tests the core library and built-in keepers
+kind: pipeline
+name: default
+
+steps:
+- name: default_test
+  image: rust:1.44
+  commands:
+  - cargo build --verbose --all
+  - cargo test --verbose --workspace --exclude secret-keeper-hashivault
+
+---
+
+# test hashivault only (rust tests and encrypt cli vault tests)
+# requires "trusted" mode to mount credential file
+kind: pipeline
+name: hashivault
+
+steps:
+- name: vault_test
+  image: rust:1.44
+  volumes:
+    - name: creds
+      path: /secrets/credentials.json
+  environment:
+    VAULT_ADDR: http://vault:8200/
+    VAULT_TOKEN: root
+    GOOGLE_APPLICATION_CREDENTIALS: /secrets/credentials.json
+  commands:
+  # install gcloud + jq,  activate google cloud sdk
+  - ci/gcloud-setup.sh
+  # Enable transit engine, equivalent to 'vault secrets enable transit'
+  - ci/vault-enable-transit
+  # build
+  - cargo build --all
+  # rust tests
+  - cargo test hashivault
+  # test encrypt cli
+  - PROG=target/debug/encrypt ./examples/encrypt-rs/test-hashivault
+
+services:
+- name: vault
+  image: vault:1.4.2
+  cap_add: [ IPC_LOCK ]
+  environment:
+    VAULT_DEV_ROOT_TOKEN_ID: root
+    DEBUG: true
+
+volumes:
+- name: creds
+  host:
+    path: /tmp/.secret-keeper/credentials.json
+
+---
+
+# test all including hashivault and encrypt-rs
+# requires "trusted" mode to mount credential file
+kind: pipeline
+name: full
+
+steps:
+- name: full_test
+  image: rust:1.44
+  volumes:
+    - name: creds
+      path: /secrets/credentials.json
+  environment:
+    VAULT_ADDR: http://vault:8200/
+    VAULT_TOKEN: root
+    GOOGLE_APPLICATION_CREDENTIALS: /secrets/credentials.json
+  commands:
+  # install gcloud + jq,  activate google cloud sdk
+  - ci/gcloud-setup.sh
+  # Enable transit engine, equivalent to 'vault secrets enable transit'
+  - ci/vault-enable-transit
+  # build
+  - cargo build --verbose --all
+  # rust tests
+  - cargo test --all
+  # encrypt cli tests
+  - PROG=target/debug/encrypt ./examples/encrypt-rs/test-env
+  - PROG=target/debug/encrypt ./examples/encrypt-rs/test-cloudkms
+  - PROG=target/debug/encrypt ./examples/encrypt-rs/test-hashivault
+
+services:
+- name: vault
+  image: vault:1.4.2
+  cap_add: [ IPC_LOCK ]
+  environment:
+    VAULT_DEV_ROOT_TOKEN_ID: root
+
+volumes:
+- name: creds
+  host:
+    path: /tmp/.secret-keeper/credentials.json
+

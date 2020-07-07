@@ -1,0 +1,14 @@
+{
+	"type": "transit",
+	"description": "",
+	"config": {
+		"options": null,
+		"default_lease_ttl": "0s",
+		"max_lease_ttl": "0s",
+		"force_no_cache": false
+	},
+	"local": false,
+	"seal_wrap": false,
+	"external_entropy_access": false,
+	"options": null
+}

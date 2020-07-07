@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TRANSIT_CFG="$DIR/transit-config.json"
+
+if [ -z "$VAULT_TOKEN" ]; then
+	echo Error: VAULT_TOKEN must be defined
+	exit 1
+fi
+if [ ! -f $TRANSIT_CFG ]; then
+	echo Missing transit config file $TRANSIT_CFG
+	exit 1
+fi
+VAULT_ADDR=${VAULT_ADDR:-"http://127.0.0.1:8200/"}
+
+exec curl -sS \
+	--header "X-Vault-Token: $VAULT_TOKEN" \
+	--data-binary @$TRANSIT_CFG \
+	"${VAULT_ADDR}v1/sys/mounts/transit"
