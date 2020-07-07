@@ -68,28 +68,28 @@ library, optional secret keeper implementations,
 and a command-line encrypt program
 (examples/encrypt-rs). You can build everything with `cargo build`.
 
-The `examples/encrypt-rs` folder contains some test shell scripts 
-for running the `encrypt` cli program with various secret keepers.
-The binary can be installed separately with `cargo install encrypt-rs`.
+The `examples/encrypt-rs` folder contains some shell scripts 
+for testing the `encrypt` cli program with various secret keepers.
+The binary can be installed independently with `cargo install encrypt-rs`.
 
 ### Testing hashivault
 
 To run hashivault tests, you will need an installed instance of
-hashiorp vault. There are two easy ways to create one for test
-purposes (requires docker):
+hashiorp vault. 
  
-  - To set up and iniitalize a vault instance, run
-`examples/hashivault/scripts/create-vault-docker.sh` and 
-`examples/hashivault/scripts/make-app-token.sh`, then `source
-examples/hashivault/secret.env` to set the VAULT_TOKEN environment
-variable. You should be able to run `cargo test hashivault` to run hashivault
-keeper tests. 
+To set up and iniitalize a vault instance in a docker container,
+for development and testing, run these three commands:
 
-  - Install `drone-cli`, the command-line interface, and run 
-`drone exec --trusted --pipeline full`. This command will run CI tests
-on a local docker instance.
+```sh
+examples/hashivault/scripts/create-vault-docker.sh
+examples/hashivault/scripts/make-app-token.sh
+source examples/hashivault/secret.env
+```
 
-See keepers/hashivault/README.md for more information.
+The last command sets the `VAULT_TOKEN` environment variable,
+which is required to run hashivault keeper tests and 
+other `vault` cli commands. The file `examples/hashivault/README.md`
+contains additional information about these scripts.
 
 ### Testing cloudkms
 
