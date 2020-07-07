@@ -3,6 +3,16 @@ set -e
 
 # test "encrypt" binary with hashivault key.
 
+# Reminders:
+#  - don't forget to unseal the fault
+#  - set VAULT_TOKEN
+#  - set VAULT_ADDR if vault is not at the default http://127.0.0.1:8200
+# If you're using the example setup from ../../examples/hashivault,
+# then these conditions can be satisfied with:
+#    ../../examples/hashivault/scripts/unseal.sh
+#    source ../../examples/hashivault/secret.env
+
+
 # file to encrypt is first parameter, otherwise "/etc/services" is used
 TEST_FILE=${1:-/etc/services}
 
@@ -22,12 +32,15 @@ KEY_NAME=${KEY_NAME:-"my-key"}
 PROG=${PROG:-$(command -v encrypt)}
 
 # enable transit secret engine
-echo "Enabling transit secrets engine"
-curl -s --header "X-Vault-Token: $VAULT_TOKEN" --data '{"type":"transit"}' "$VAULT_ADDR/v1/sys/mounts/transit"
+#echo "Enabling transit secrets engine"
+#try_list=$(curl -sS -XLIST -L --header "X-Vault-Token: $VAULT_TOKEN" "$VAULT_ADDR/v1/transit/" | grep -s "no handler for route" 2>&1 || echo)
+#if [ -n "$try_list" ]; then
+#    curl -sS --header "X-Vault-Token: $VAULT_TOKEN" --data '{"type":"transit"}' "$VAULT_ADDR/v1/sys/mounts/transit"
+#fi
 
 # create key 'my-key' for AES-GCM 256-bit encryption
 echo "Creating key $KEY_NAME"
-curl -X POST  \
+curl -sS -X POST  \
   --header "X-Vault-Token: $VAULT_TOKEN" \
   --data "{\"type\":\"$KEY_TYPE\",\"exportable\":false,\"allow_plaintext_backup\":false}" \
   ${VAULT_ADDR}v1/transit/keys/$KEY_NAME
