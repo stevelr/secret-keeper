@@ -10,9 +10,11 @@ use std::env;
 use url::Url;
 
 /// environment variable used to store token, (if not provided in keeper uri)
-pub(crate) const ENV_VAULT_TOKEN: &str = "VAULT_TOKEN";
+pub(crate) const VAULT_TOKEN: &str = "VAULT_TOKEN";
 /// environment variable used to hold vault address, if not provided in keeper uri
-pub(crate) const ENV_VAULT_ADDR: &str = "VAULT_ADDR";
+pub(crate) const VAULT_ADDR: &str = "VAULT_ADDR";
+/// fallback for VAULT_ADDR if not defined (without trailing slash)
+pub(crate) const DEFAULT_VAULT_ADDR: &str = "http://127.0.0.1:8200";
 
 /// default hashicorp listen port - can be overridden in keeper uri
 const DEFAULT_PORT: u16 = 8200;
@@ -22,7 +24,7 @@ pub const URL_SCHEME: &str = "hashivault";
 /// url paths used in this api
 const TRANSIT_ENCRYPT_URL: &str = "/v1/transit/encrypt/";
 const TRANSIT_DECRYPT_URL: &str = "/v1/transit/decrypt/";
-const TRANSIT_NEWKEY_URL: &str = "/v1/transit/keys/";
+const TRANSIT_KEY_URL: &str = "/v1/transit/keys/";
 const TOKEN_RENEW_URL: &str = "/v1/auth/token/renew/";
 
 #[doc(internal)]
@@ -71,6 +73,13 @@ pub struct PlainData {
     plaintext: String,
 }
 
+/// Structure used to enable deletion on key
+#[doc(internal)]
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DeletionConfig {
+    deletion_allowed: bool,
+}
+
 /// concatenate strings
 #[doc(internal)]
 macro_rules! strcat {
@@ -108,7 +117,7 @@ pub async fn post_json<'c, REQ, RESP>(
     body: REQ,
 ) -> Result<RESP, Error>
 where
-    REQ: Serialize,
+    REQ: Serialize + std::fmt::Debug,
     RESP: for<'de> serde::de::Deserialize<'de>,
 {
     let res = post(client, url, body)
@@ -129,16 +138,28 @@ pub async fn post<REQ>(
     body: REQ,
 ) -> Result<reqwest::Response, Error>
 where
-    REQ: Serialize,
+    REQ: Serialize + std::fmt::Debug,
 {
     let res = client
         .post(&url)
         .json(&body)
         .send()
         .await
-        .map_err(|e| Error::OtherError(format!("Vault server IO error: {:?}", e)))?
-        .error_for_status() // turn non-200 status into error
-        .map_err(|e| Error::OtherError(format!("Vault server api failed: {:?}", e)))?;
+        .map_err(|e| Error::OtherError(format!("Vault server IO error: {:?}", e)))?;
+    if !res.status().is_success() {
+        eprintln!(
+            "vault request error status {:?} url {}\nclient: {:#?}\nbody: {:#?}\nresponse: {:#?}",
+            res.status(),
+            &url,
+            &client,
+            &body,
+            &res
+        );
+        return Err(Error::OtherError(format!(
+            "Vault server api error: {:?}",
+            res.error_for_status()
+        )));
+    }
     Ok(res)
 }
 
@@ -148,7 +169,7 @@ where
 pub async fn create_key(spec: &ClientSpec, key_type: &str) -> Result<(), Error> {
     // TODO: key_type should be an enum
     let client = new_client(&spec.token)?;
-    let url = format!("{}{}{}", spec.base_url, TRANSIT_NEWKEY_URL, spec.key_name);
+    let url = format!("{}{}{}", spec.base_url, TRANSIT_KEY_URL, spec.key_name);
     let _ = post(
         &client,
         url,
@@ -168,7 +189,6 @@ pub async fn renew_token(spec: &ClientSpec) -> Result<(), Error> {
     Ok(())
 }
 
-//        http://127.0.0.1:8200/v1/auth/token/renew/<TOKEN>
 /// Encrypt the plaintext data using transit api, using key hosted on vault server
 /// Returns data as string of the form: vault:v1:<base64-encoded-data>
 pub async fn encrypt(spec: &ClientSpec, plaintext: &[u8]) -> Result<String, Error> {
@@ -200,6 +220,36 @@ pub async fn decrypt(spec: &ClientSpec, ciphertext: String) -> Result<Vec<u8>, E
     Ok(bindata)
 }
 
+/// Send key delete request to vault server, returning http response
+/// Returns error if there are any IO errors
+#[allow(dead_code)]
+pub async fn delete_key(spec: &ClientSpec) -> Result<(), Error> {
+    let client = new_client(&spec.token)?;
+    let url = format!("{}{}{}", spec.base_url, TRANSIT_KEY_URL, spec.key_name);
+
+    // two api calls are required to delete a key:
+    //   the deletion_allowed must be set on the key's endpoint
+    //   then deletion may be called
+    let key_config_url = strcat!(&url, "/config");
+    let _ = post(
+        &client,
+        key_config_url,
+        DeletionConfig {
+            deletion_allowed: true,
+        },
+    )
+    .await?;
+
+    let _ = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| Error::OtherError(format!("Vault server IO error: {:?}", e)))?
+        .error_for_status()
+        .map_err(|e| Error::OtherError(format!("Vault server api delete error: {:?}", e)))?;
+    Ok(())
+}
+
 /// extract query parameter from url.
 ///   Example: url "http://server/path?foo=bar", foo => "bar"
 /// Returns None if token is undefined or empty
@@ -213,10 +263,10 @@ fn get_query_value(url: &Url, key: &str) -> Option<String> {
 }
 
 pub fn get_base_url() -> String {
-    env::var(ENV_VAULT_ADDR)
+    env::var(VAULT_ADDR)
         .map(|s| String::from(remove_trailing_slash(&s)))
         // not in env, fallback to default
-        .unwrap_or(String::from("http://127.0.0.1:8200"))
+        .unwrap_or(String::from(DEFAULT_VAULT_ADDR))
 }
 
 impl ClientSpec {
@@ -260,6 +310,7 @@ impl ClientSpec {
             let host = url.host_str().unwrap();
             let scheme = match url.scheme() {
                 "hashivault" => {
+                    // these default schemes can always be overridden with third format above
                     if host == "localhost" || host.starts_with("127.") {
                         "http"
                     } else {
@@ -296,7 +347,7 @@ impl ClientSpec {
         // look for 'token=' query parameter, or look in environment if not in url
         let token = match get_query_value(&url, "token") {
             Some(v) => v,
-            None => env::var(ENV_VAULT_TOKEN).unwrap_or(String::from("")),
+            None => env::var(VAULT_TOKEN).unwrap_or(String::from("")),
         };
         // handle cases where query param or env var is defined, but empty
         if token.len() == 0 {
