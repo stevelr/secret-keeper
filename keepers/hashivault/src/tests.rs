@@ -18,6 +18,8 @@ use super::{HashivaultKeeper, HashivaultOptions};
 // name of environment variable holding key type to be used for tests.
 // If not defined, default of "aes256-gcm96" is used
 const KEYTYPE_ENV: &str = "VAULT_KEY_TYPE";
+const DEFAULT_KEYTYPE: &str = "aes256-gcm96";
+const DEFAULT_VAULT_ADDR: &str = "http://127.0.0.1:8200/";
 
 lazy_static! {
     // Because some of tests modify the environment variable (VAULT_TOKEN).
@@ -42,7 +44,7 @@ fn test_getenv() -> Result<String, Error> {
         Some(val) => Ok(val.to_string()),
         None => {
             // The first time this is invoked, initialize TOKEN from environment
-            let val = getenv(ENV_VAULT_TOKEN)?; // or return Err if not defined
+            let val = getenv(VAULT_TOKEN)?; // or return Err if not defined
             *token = Some(val.clone());
             Ok(val)
         }
@@ -53,21 +55,33 @@ fn test_getenv() -> Result<String, Error> {
 /// wrap and unwrap using the keeper api
 async fn hashivault_wrap_unwrap() -> Result<(), Error> {
     let token = test_getenv()?;
-    let rand_key = format!("test_key_{}", hex::encode(random_bytes(4)));
+    assert!(token.len() > 0);
+    println!("wrap_unwrap, token={}", token);
+    let vault_keyname = format!("test_key_{}", hex::encode(random_bytes(4)));
+    let uri = format!("hashivault://{}?token={}", vault_keyname, token);
 
-    let uri = format!("hashivault://{}?token={}", rand_key, token);
+    let spec = ClientSpec::from_uri(&uri)?;
+    // create key on vault
+    println!("about to create key, uri={}", &uri);
+    let key_type = getenv_default(KEYTYPE_ENV, DEFAULT_KEYTYPE);
+    let _ = create_key(&spec, &key_type).await?;
+    println!("wrap_unwrap: created key (type {}): {:#?}", key_type, spec);
+
     let keeper = HashivaultKeeper::new(HashivaultOptions::defaults()).await?;
+    println!("wrap_unwrap: keeper created");
 
     let key = random_bytes(32);
     let nonce = random_bytes(16);
-
     let wrapped = keeper.wrap(&uri, &nonce, &key).await?;
-    println!("wrapped: {}", wrapped.key_enc);
-
+    println!("wrap_unwrap: wrapped");
     let unwrapped = keeper.unwrap(&nonce, &wrapped).await?;
-
+    println!("wrap_unwrap: unwrapped");
     assert!(arrays_eq(&key, &unwrapped.as_ref()));
 
+    // cleanup
+    let _ = delete_key(&spec).await?;
+
+    println!("wrap_unwrap: done!!");
     Ok(())
 }
 
@@ -75,10 +89,10 @@ async fn hashivault_wrap_unwrap() -> Result<(), Error> {
 /// encrypt and decrypt using vault_client api
 async fn hashivault_encrypt_decrypt() -> Result<(), Error> {
     let token = test_getenv()?;
-    let key_type = getenv_default(KEYTYPE_ENV, "aes256-gcm96");
-    let rand_key = format!("test_key_{}", hex::encode(random_bytes(5)));
+    let key_type = getenv_default(KEYTYPE_ENV, DEFAULT_KEYTYPE);
+    let vault_keyname = format!("test_key_{}", hex::encode(random_bytes(5)));
 
-    let spec = ClientSpec::from_uri(&format!("hashivault://{}?token={}", rand_key, token))?;
+    let spec = ClientSpec::from_uri(&format!("hashivault://{}?token={}", vault_keyname, token))?;
     let _ = create_key(&spec, &key_type).await?;
 
     let plaintext: &[u8] = "Your base are encrypted".as_bytes();
@@ -87,6 +101,8 @@ async fn hashivault_encrypt_decrypt() -> Result<(), Error> {
 
     assert!(arrays_eq(plaintext, &binresult));
 
+    // cleanup
+    let _ = delete_key(&spec).await?;
     Ok(())
 }
 
@@ -103,7 +119,7 @@ fn remove_trailing_slash(s: &str) -> &str {
 fn hashivault_uri_parse() -> Result<(), Error> {
     let _guard = TOKEN.lock();
     let spec = ClientSpec::from_uri("hashivault://mykey?token=123")?;
-    let vault_addr = getenv_default("VAULT_ADDR", "http://127.0.0.1:8200");
+    let vault_addr = getenv_default("VAULT_ADDR", DEFAULT_VAULT_ADDR);
     let addr = remove_trailing_slash(&vault_addr);
 
     assert_eq!(spec.base_url, addr);
@@ -131,7 +147,7 @@ fn hashivault_uri_parse() -> Result<(), Error> {
 /// test url parsing: host, port
 fn hashivault_uri_hostport() -> Result<(), Error> {
     let spec = ClientSpec::from_uri("hashivault://mykey?token=123")?;
-    let vault_addr = getenv_default("VAULT_ADDR", "http://127.0.0.1:8200");
+    let vault_addr = getenv_default("VAULT_ADDR", DEFAULT_VAULT_ADDR);
     let addr = remove_trailing_slash(&vault_addr);
     assert_eq!(
         spec.base_url, addr,
@@ -216,12 +232,12 @@ fn hashivault_uri_token() -> Result<(), Error> {
     let _guard = TOKEN.lock();
 
     // clear from environment, should generate error
-    env::set_var(ENV_VAULT_TOKEN, "");
+    env::set_var(VAULT_TOKEN, "");
     let r = ClientSpec::from_uri("hashivault://mykey");
     assert!(
         r.is_err(),
         "expect err for missing token, found {:#?}",
-        env::var(ENV_VAULT_TOKEN)
+        env::var(VAULT_TOKEN)
     );
 
     // empty token is invalid
@@ -229,7 +245,7 @@ fn hashivault_uri_token() -> Result<(), Error> {
     assert!(r.is_err(), "expect err for empty token: {:#?}", r);
 
     // set known token from environment, verify it is used as default
-    env::set_var(ENV_VAULT_TOKEN, "abc123");
+    env::set_var(VAULT_TOKEN, "abc123");
     let r = ClientSpec::from_uri("hashivault://mykey");
     assert!(r.is_ok(), "env token");
     let spec = r.unwrap();
@@ -244,7 +260,7 @@ fn hashivault_uri_token() -> Result<(), Error> {
     assert_eq!(spec.token, "thisone", "token {} from url", spec.token);
 
     // restore the value from start of test
-    env::set_var(ENV_VAULT_TOKEN, orig_value);
+    env::set_var(VAULT_TOKEN, orig_value);
     Ok(())
 }
 
