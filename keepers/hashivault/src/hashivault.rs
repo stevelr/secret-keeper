@@ -43,7 +43,7 @@ pub struct HashivaultOptions<'s> {
     /// as long as the expected runtime of the keeper.
     /// The token to be renewed is specified either with the "?token=" parameter
     /// of initial_uri, or in the environment variable VAULT_TOKEN
-    renew_on_start: bool,
+    pub renew_on_start: bool,
 
     /// The URI provided in opts is only currently used for initialization,
     /// and, only if renew_on_start is true.
@@ -51,7 +51,7 @@ pub struct HashivaultOptions<'s> {
     /// either in the initial_uri OR in the environment variable VAULT_ADDR
     /// It is ignored for wrap and unwrap calls, in favor of the uri passed
     /// to those functions.
-    initial_uri: &'s str,
+    pub initial_uri: &'s str,
 }
 
 impl<'o> HashivaultOptions<'o> {
