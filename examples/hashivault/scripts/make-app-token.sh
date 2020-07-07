@@ -14,9 +14,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROLE_NAME="secret-keeper"                  # new approle
 ROOT_TOKEN_FILE="$DIR/../secret-root.env"  # existing file with root token
 APP_TOKEN_FILE="$DIR/../secret.env"        # file to be created with new app token
+TRANSIT_POLICY_FILE="$DIR/../../../ci/transit-policy.hcl"
 
 export VAULT_ADDR=${VAULT_ADDR:-http://127.0.0.1:8200/}
-
 
 # Alternately, you could set VAULT_TOKEN to a valid root token
 if [ -f $ROOT_TOKEN_FILE ]; then
@@ -24,6 +24,11 @@ if [ -f $ROOT_TOKEN_FILE ]; then
 elif [ -z "$VAULT_TOKEN" ]; then
   echo Did not find $ROOT_TOKEN_FILE, which is created by create-vault-docker.sh.
   exit 1
+fi
+
+if [ ! -f "$TRANSIT_POLICY_FILE" ]; then
+	echo Missing transit policy file. expected at $TRANSIT_POLICY_FILE
+	exit 1
 fi
 
 # enable AppRole authentication method if not already enabled
@@ -42,16 +47,9 @@ else
     echo "transit secrets engine already enabled"
 fi
 
-# define policy that allows secretkeeper to create, read, and modify transit keys
-cat > _sk_policy.hcl <<EOF
-# grant create-key and read-key permission on transit keys
-path  "transit/*"  {
-  capabilities = [ "create","read","update","delete","list" ]
-}
-EOF
-
+# define policy that allows secret-keeper to create, read, and modify transit keys
 # upload the policy
-vault policy write "$ROLE_NAME" _sk_policy.hcl
+vault policy write "$ROLE_NAME" "$TRANSIT_POLICY_FILE"
 
 # create role for secret-keeper with an long, renewable TTL
 vault write -f auth/approle/role/${ROLE_NAME} \
@@ -79,7 +77,6 @@ NEW_TOKEN=$(grep "token " _sk_login | sed s/token// | tr -d ' ')
 
 # clean up files containing intermediate secrets
 rm -f _sk*
-
 
 echo export VAULT_TOKEN=\"$NEW_TOKEN\" > $APP_TOKEN_FILE
 
