@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+unset VAULT_TOKEN
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DATA_DIR=$DIR/..
 
