@@ -6,18 +6,6 @@ use your estiblished procedures instead. If you are a vault newbie
 and want to get something working quickly on a development machine,
 this may help.
 
-After running, there should be a vault container listening on
-http://127.0.0.1:8200. 
-Three files are generated from these scripts:
-- init-SECRETS.log - the output log from initial run of the vault
-  container. Contains the unseal keys needed for initializing the vault
-  after a restart. If you lose these, the vault will be unrecoverable!!
-- secret-root.env - sets VAULT_TOKEN environment variable to the root
-  token that authorizes all actions on the vault
-- secret.env - sets VAULT_TOKEN to an app-specific token that has more
-  limited permissions. This is the one that the demo apps use.
-
-
 Prerequisites: docker, docker-compose, bash
 
 ```
@@ -42,6 +30,17 @@ If the scripts worked, you can run the hashivault tests!
     source secret.env
     cargo test hashivault
 ```
+
+After running, there should be a vault container listening on
+http://127.0.0.1:8200. 
+Three files are generated from these scripts:
+- init-SECRETS.log - the output log from initial run of the vault
+  container. Contains the unseal keys needed for initializing the vault
+  after a restart. If you lose these, the vault will be unrecoverable!!
+- secret-root.env - sets VAULT_TOKEN environment variable to the root
+  token that authorizes all actions on the vault
+- secret.env - sets VAULT_TOKEN to an app-specific token that has more
+  limited permissions. This is the one that the demo apps use.
 
 In the event the docker container is restarted (or your dev machine
 reboots, you will need to unseal it again to make its api available.
