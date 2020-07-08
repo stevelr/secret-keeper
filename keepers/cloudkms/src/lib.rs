@@ -115,10 +115,30 @@ impl CloudKmsKeeper {
     }
 }
 
-/// convert keeper uri to kms location id
-/// in : /PROJECT/LOCATION/KEYRING/KEY
-/// out: [ PROJECT, LOCATION, KEYRING, KEY]
-/// out: projects/PROJECT/locations/LOCATION/keyRings/KEYRING/cryptoKeys/KEY",
+/// Turns keeper uri into CloudKMS Key location url
+/// in:  "/PROJECT/LOCATION/KEYRING/KEY"
+/// out: "projects/PROJECT/locations/LOCATION/keyRings/KEYRING/cryptoKeys/KEY",
+fn key_path(uri: &str) -> Result<String, Error> {
+    let parts = path_split(uri, 4usize)?;
+    Ok(format!(
+        "projects/{}/locations/{}/keyRings/{}/cryptoKeys/{}",
+        parts[0], parts[1], parts[2], parts[3]
+    ))
+}
+
+/// Turns keeper uri into CloudKMS KeyRing location url
+/// in:  "/PROJECT/LOCATION/KEYRING"
+/// out: "projects/PROJECT/locations/LOCATION/keyRings/KEYRING",
+fn keyring_path(uri: &str) -> Result<String, Error> {
+    let parts = path_split(uri, 3usize)?;
+    Ok(format!(
+        "projects/{}/locations/{}/keyRings/{}",
+        parts[0], parts[1], parts[2]
+    ))
+}
+
+/// Support func for keyring_path and key_path
+/// splits keeper uri into keyring path (3 parts) or key path (4 parts)
 fn path_split(uri: &str, expect: usize) -> Result<Vec<String>, Error> {
     let url =
         Url::parse(uri).map_err(|e| Error::OtherError(format!("uri parse failed: {:?}", e)))?;
@@ -138,22 +158,6 @@ fn path_split(uri: &str, expect: usize) -> Result<Vec<String>, Error> {
     }
     parts.remove(0);
     Ok(parts)
-}
-
-fn key_path(uri: &str) -> Result<String, Error> {
-    let parts = path_split(uri, 4usize)?;
-    Ok(format!(
-        "projects/{}/locations/{}/keyRings/{}/cryptoKeys/{}",
-        parts[0], parts[1], parts[2], parts[3]
-    ))
-}
-
-fn keyring_path(uri: &str) -> Result<String, Error> {
-    let parts = path_split(uri, 3usize)?;
-    Ok(format!(
-        "projects/{}/locations/{}/keyRings/{}",
-        parts[0], parts[1], parts[2]
-    ))
 }
 
 #[async_trait]
