@@ -1,7 +1,7 @@
 [package]
 name = "secret-keeper-hashivault"
 description = "Hashivault SecretKeeper, an integration with Hashicorp Vault for https://crates.io/crates/secret-keeper"
-version = "0.3.2"
+version = "0.3.4"
 authors = ["stevelr <git@somecool.net>"]
 edition = "2018"
 license = "Apache-2.0 OR MIT"
