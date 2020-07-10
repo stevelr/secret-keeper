@@ -1,0 +1,39 @@
+version: 2.1
+orbs:
+  gcp-cli: circleci/gcp-cli@1.8.4
+
+executors:
+  main-executor:
+    docker:
+      - image: cimg/rust:1.44
+      - image: vault:1.4.2
+        name: vault
+        environment:
+          VAULT_DEV_ROOT_TOKEN_ID: root
+          VAULT_ADDR: http://vault:8200/
+          VAULT_TOKEN: root
+          GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
+
+jobs:
+  build:
+    executor: main-executor
+    steps:
+      - gcp-cli/install
+      - gcp-cli/initialize
+      - checkout
+      - run:
+          name: Setup
+          command: |
+            ci/vault-enable-transit
+      - run:
+          name: Build
+          command: |
+            cargo build --all
+      - run:
+          name: Test
+          command: |
+            cargo test --all
+            PROG=target/debug/encrypt ./examples/encrypt-rs/test-env
+            PROG=target/debug/encrypt ./examples/encrypt-rs/test-cloudkms
+            PROG=target/debug/encrypt ./examples/encrypt-rs/test-hashivault
+  
