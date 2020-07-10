@@ -16,7 +16,8 @@ executors:
           VAULT_ADDR: http://vault:8200/
           VAULT_TOKEN: root
 
-step_install_gcloud_cli:
+
+step-install-gcloud-cli: &step-install-gcloud-cli
   run:
     name: install
     command: |
@@ -26,11 +27,12 @@ step_install_gcloud_cli:
       gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
       gcloud config set project $GOOGLE_PROJECT_ID --installation
 
+
 jobs:
   build:
     executor: main-executor
     steps:
-      - *step_install_gcloud_cli
+      - *step-install-gcloud-cli
       - checkout
       - run:
           name: Setup
