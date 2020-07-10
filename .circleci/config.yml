@@ -17,13 +17,16 @@ executors:
           VAULT_TOKEN: root
 
 
-step-install-gcloud-cli: &step-install-gcloud-cli
+step-gcloud-cli-install-init: &step-gcloud-cli-install-init
   run:
-    name: install
+    name: gcloud-install
     command: |
       curl -s https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz | tar xz
       echo 'source ~/goole-cloud-sdk/path.bash.inc' >> $BASH_ENV
       echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+  run:
+    name: gcloud-initialize
+    command: |
       gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
       gcloud config set project $GOOGLE_PROJECT_ID --installation
 
@@ -32,7 +35,7 @@ jobs:
   build:
     executor: main-executor
     steps:
-      - *step-install-gcloud-cli
+      - *step-gcloud-cli-install-init
       - checkout
       - run:
           name: Setup
