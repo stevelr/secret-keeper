@@ -1,25 +1,36 @@
 version: 2.1
-orbs:
-  gcp-cli: circleci/gcp-cli@1.8.4
 
 executors:
   main-executor:
     docker:
       - image: cimg/rust:1.44
+        environment:
+          GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
+          VAULT_ADDR: http://vault:8200/
+          VAULT_TOKEN: root
+
       - image: vault:1.4.2
         name: vault
         environment:
           VAULT_DEV_ROOT_TOKEN_ID: root
           VAULT_ADDR: http://vault:8200/
           VAULT_TOKEN: root
-          GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
+
+step_install_gcloud_cli:
+  run:
+    name: install
+    command: |
+      curl -s https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz | tar xz
+      echo 'source ~/goole-cloud-sdk/path.bash.inc' >> $BASH_ENV
+      echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+      gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+      gcloud config set project $GOOGLE_PROJECT_ID --installation
 
 jobs:
   build:
     executor: main-executor
     steps:
-      - gcp-cli/install
-      - gcp-cli/initialize
+      - *step_install_gcloud_cli
       - checkout
       - run:
           name: Setup
