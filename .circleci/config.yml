@@ -69,6 +69,11 @@ step-verify-build-requirements: &step-verify-build-requirements
           && echo "Credentials file missing" && exit 1
       (command -v rustc) || ( echo "Rust not installed" && exit 1 )
       (command -v gcloud) || ( echo "Google Cloud SDK not installed" && exit 1 )
+      if [ -d /home/circleci/.ssh ]; then
+        ls -al /home/circleci/.ssh
+      else
+        echo no ssh folder
+      fi
 
 jobs:
   build:
