@@ -17,25 +17,68 @@ executors:
           VAULT_TOKEN: root
 
 
-step-gcloud-cli-install-init: &step-gcloud-cli-install-init
+step-ensure-libssl: &step-ensure-libssl
+  # needed to for compiling some rust dependencies on circleci debian image
+  #     (oath->ring, tokio/tls)
   run:
-    name: gcloud-install
+    name: install-libssl
     command: |
-      curl -s https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz | tar xz
-      echo 'source ~/goole-cloud-sdk/path.bash.inc' >> $BASH_ENV
-      echo $GCLOUD_SERVICE_KEY > ${HOME}/gcloud-service-key.json
+      sudo apt-get update \
+          && sudo apt-get install -y pkg-config openssl libssl-dev
+
+step-gcloud-cli-install: &step-gcloud-cli-install
+  # Install Google Cloud SDK (gcloud cli)
   run:
-    name: gcloud-initialize
+    name: install-gcloud
     command: |
-      gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+      curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz\
+         | (cd $HOME;  tar xz)
+      echo 'export PATH=/home/circleci/google-cloud-sdk/bin:$PATH' >> $BASH_ENV
+      if [ -n "$GCLOUD_SERVICE_KEY" ]; then
+        echo "$GCLOUD_SERVICE_KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
+      fi
+
+step-gcloud-cli-init: &step-gcloud-cli-init
+  # Initialize Google Cloud SDK (gcloud cli)
+  run:
+    name: initialize-gcloud
+    command: |
+      gcloud auth activate-service-account "--key-file=$GOOGLE_APPLICATION_CREDENTIALS"
       gcloud config set project $GOOGLE_PROJECT_ID --installation
 
+step-local-net-config: &step-local-net-config
+  # import secrets when running locally
+  run:
+    name: local-net-config
+    command: |
+      if [ -n "$LOCAL_CONFIG_URL" ]; then
+        curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
+        bash /tmp/local_cfg.sh
+      fi
+
+step-verify-build-requirements: &step-verify-build-requirements
+  # perform sanity tests before we get started
+  run:
+    name: verify-build-requirements
+    command: |
+      [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
+          && echo "Environment must define GOOGLE_APPLICATION_CREDENTIALS" && exit 1
+      [ -z "$GOOGLE_PROJECT_ID" ] \
+          && echo "Environment must define GOOGLE_PROJECT_ID" && exit 1
+      [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ] \
+          && echo "Credentials file missing" && exit 1
+      (command -v rustc) || ( echo "Rust not installed" && exit 1 )
+      (command -v gcloud) || ( echo "Google Cloud SDK not installed" && exit 1 )
 
 jobs:
   build:
     executor: main-executor
     steps:
-      - *step-gcloud-cli-install-init
+      - *step-local-net-config
+      - *step-ensure-libssl
+      - *step-gcloud-cli-install
+      - *step-gcloud-cli-init
+      - *step-verify-build-requirements
       - checkout
       - run:
           name: Setup
@@ -53,3 +96,4 @@ jobs:
             PROG=target/debug/encrypt ./examples/encrypt-rs/test-cloudkms
             PROG=target/debug/encrypt ./examples/encrypt-rs/test-hashivault
   
+
