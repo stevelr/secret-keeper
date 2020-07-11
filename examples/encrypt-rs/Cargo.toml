@@ -10,10 +10,10 @@ keywords = ["security","crypto","xchacha20","aes", "lz4"]
 categories = ["cryptography","command-line-utilities"]
 
 [dependencies]
-secret-keeper = { version = "0.3" }
-secret-keeper-prompt = { version = "0.3", optional = true}
-secret-keeper-hashivault = { version = "0.3", optional = true}
-secret-keeper-cloudkms = { version = "0.3", optional = true}
+secret-keeper = { version = "0.3", path = "../../core" }
+secret-keeper-prompt = { version = "0.3", optional = true, path = "../../keepers/prompt"}
+secret-keeper-hashivault = { version = "0.3", optional = true, path = "../../keepers/hashivault"}
+secret-keeper-cloudkms = { version = "0.3", optional = true, path = "../../keepers/cloudkms"}
 
 bincode = "1.2"
 clap = { version = "3.0.0-beta.1", git="https://github.com/clap-rs/clap/" }
