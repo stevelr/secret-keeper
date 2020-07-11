@@ -10,7 +10,7 @@ categories = ["cryptography"]
 repository = "https://github.com/stevelr/secret-keeper/tree/master/keepers/prompt"
 
 [dependencies]
-secret-keeper = { version = "0.3" }
+secret-keeper = { version = "0.3", path="../../core" }
 async-trait = "0.1"
 bytes = "0.5"
 rpassword = { version = "4.0" }
