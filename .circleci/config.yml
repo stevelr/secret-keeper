@@ -84,6 +84,9 @@ jobs:
       - *step-gcloud-cli-install
       - *step-gcloud-cli-init
       - *step-verify-build-requirements
+      - add_ssh_keys:
+          fingerprints:
+            - "fe:86:48:d8:c1:28:1c:3b:f1:d1:eb:4a:bd:2e:4a:db"
       - checkout
       - run:
           name: Setup
