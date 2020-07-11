@@ -89,6 +89,10 @@ jobs:
             - "fe:86:48:d8:c1:28:1c:3b:f1:d1:eb:4a:bd:2e:4a:db"
       - checkout
       - run:
+          # undo circle github setting so cargo checkouts work
+          name: Unset CircleCI's forced conversion of HTTPS->SSH
+          command: git config --global --unset "url.ssh://git@github.com.insteadof"
+      - run:
           name: Setup
           command: |
             ci/vault-enable-transit
