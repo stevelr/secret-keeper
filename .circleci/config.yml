@@ -1,27 +1,10 @@
 version: 2.1
 
-executors:
-  main-executor:
-    docker:
-      - image: cimg/rust:1.44
-        environment:
-          GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
-          VAULT_ADDR: http://vault:8200/
-          VAULT_TOKEN: root
-
-      - image: vault:1.4.2
-        name: vault
-        environment:
-          VAULT_DEV_ROOT_TOKEN_ID: root
-          VAULT_ADDR: http://vault:8200/
-          VAULT_TOKEN: root
-
-
 step-ensure-libssl: &step-ensure-libssl
   # needed to for compiling some rust dependencies on circleci debian image
   #     (oath->ring, tokio/tls)
   run:
-    name: install-libssl
+    name: Install libssl
     command: |
       sudo apt-get update \
           && sudo apt-get install -y pkg-config openssl libssl-dev
@@ -29,7 +12,7 @@ step-ensure-libssl: &step-ensure-libssl
 step-gcloud-cli-install: &step-gcloud-cli-install
   # Install Google Cloud SDK (gcloud cli)
   run:
-    name: install-gcloud
+    name: Install gcloud
     command: |
       curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz\
          | (cd $HOME;  tar xz)
@@ -41,7 +24,7 @@ step-gcloud-cli-install: &step-gcloud-cli-install
 step-gcloud-cli-init: &step-gcloud-cli-init
   # Initialize Google Cloud SDK (gcloud cli)
   run:
-    name: initialize-gcloud
+    name: Initialize gcloud
     command: |
       gcloud auth activate-service-account "--key-file=$GOOGLE_APPLICATION_CREDENTIALS"
       gcloud config set project $GOOGLE_PROJECT_ID --installation
@@ -49,7 +32,7 @@ step-gcloud-cli-init: &step-gcloud-cli-init
 step-local-net-config: &step-local-net-config
   # import secrets when running locally
   run:
-    name: local-net-config
+    name: Get local config
     command: |
       if [ -n "$LOCAL_CONFIG_URL" ]; then
         curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
@@ -58,8 +41,9 @@ step-local-net-config: &step-local-net-config
 
 step-verify-build-requirements: &step-verify-build-requirements
   # perform sanity tests before we get started
+  # also check build variables
   run:
-    name: verify-build-requirements
+    name: Verify build requirements
     command: |
       [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
           && echo "Environment must define GOOGLE_APPLICATION_CREDENTIALS" && exit 1
@@ -74,38 +58,164 @@ step-verify-build-requirements: &step-verify-build-requirements
       else
         echo no ssh folder
       fi
+      if [ "$BUILD_MODE" != "debug" ] && [ "$BUILD_MODE" != "release" ]; then
+        echo "Invalid BUILD_MODE: should be 'debug' or 'release'"
+        exit 1
+      fi
+      if [ "$RUST_VER" != "stable" ] && [ "$RUST_VER" != "nightly" ]; then
+        echo "Invalid RUST_VER: should be 'stable' or 'nightly'"
+        exit 1
+      fi
+
+step-select-rustver: &step-select-rustver
+  run:
+    # use rust-stable (default) or switch to nightly
+    name: Select rust version
+    command: |
+      if [ "$RUST_VER" = "nightly" ]; then
+        rustup default nightly
+      fi
+
+step-fix-github: &step-fix-github
+  run:
+    # undo circle github setting so cargo checkouts work
+    # this step should immediately follow 'checkout'
+    name: Unset CircleCI's forced conversion of HTTPS->SSH
+    command: |
+      if [ -z "$LOCAL_CONFIG_URL" ]; then
+        git config --global --unset "url.ssh://git@github.com.insteadof"
+      fi
+
+step-build-all: &step-build-all
+  run:
+    name: Build all packages
+    command: |
+      if [ "$BUILD_MODE" = "release" ]; then
+        cargo build --all --release
+      else
+        cargo build --all
+      fi
+
+step-setup-vault: &step-setup-vault
+  run:
+    name: setup-vault
+    command: |
+      ci/vault-enable-transit
+
+step-test-libs: &step-test-libs
+  run:
+    name: Test libs and docs
+    command: |
+      if [ "$BUILD_MODE" = "release" ]; then
+        cargo build --all --release
+      else
+        cargo build --all
+      fi
+
+step-test-encrypt-cli: &step-test-encrypt-cli
+  run:
+    name: Test encrypt cli
+    command: |
+      cargo test --all
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-env
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-cloudkms
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-hashivault
+  
+step-show-config: &step-show-config
+  run:
+    name: Show build config
+    environment:
+      GIT_BRANCH: << pipeline.git.branch >>
+      GIT_REVISION: << pipeline.git.revision >>
+      PIPELINE_NUM: << pipeline.number >>
+      PIPELINE_ID: << pipeline.id >>
+    command: |
+      echo "Build mode:    $BUILD_MODE"
+      echo "Rust channel:  $RUST_VER"
+      echo "Rust release:  $(rustc --version)"
+      echo "Debian:        $(cat /etc/debian_version)"
+      echo "Git branch:    $GIT_BRANCH"
+      echo "Git revision:  $GIT_REVISION"
+      echo "Pipeline id:   $PIPELINE_ID"
+      echo "Pipeline num:  $PIPELINE_NUMBER"
+      #echo "Gcloud SDK:    $(gcloud --version)"
+      #echo "Git user:      $(git config --get user.email)"
+
+
+executors:
+  rust-docker:
+    parameters:
+      img:
+        type: string
+        default: "cimg/rust:1.44"
+    docker:
+      - image: << parameters.img >>
+        environment:
+          GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
+          VAULT_ADDR: http://vault:8200/
+          VAULT_TOKEN: root
+      - image: vault:1.4.2
+        name: vault
+        environment:
+          VAULT_DEV_ROOT_TOKEN_ID: root
+          VAULT_ADDR: http://vault:8200/
+          VAULT_TOKEN: root
+
+
+commands:
+  build-test:
+    description: "Setup, build, and run all tests"
+    steps:
+      - *step-show-config
+      #- *step-local-net-config
+      #- *step-ensure-libssl
+      #- *step-gcloud-cli-install
+      #- *step-gcloud-cli-init
+      #- *step-verify-build-requirements
+      - *step-select-rustver
+      #- checkout
+      #- *step-fix-github
+      #- *step-setup-vault
+      #- *step-build-all
+      #- *step-test-libs
+      #- *step-run-encrypt-cli-tests
+  
 
 jobs:
   build:
-    executor: main-executor
+    parameters:
+      img:
+        type: string
+        default: "cimg/rust:1.44"
+      mode:
+        type: string
+        default: "debug"
+      rustver:
+        type: string
+        default: "stable"
+    executor:
+      name: rust-docker
+      img: << parameters.img >>
+    environment:
+      - BUILD_MODE: << parameters.mode >>
+      - RUST_VER: << parameters.rustver >>
     steps:
-      - *step-local-net-config
-      - *step-ensure-libssl
-      - *step-gcloud-cli-install
-      - *step-gcloud-cli-init
-      - *step-verify-build-requirements
-      - add_ssh_keys:
-          fingerprints:
-            - "fe:86:48:d8:c1:28:1c:3b:f1:d1:eb:4a:bd:2e:4a:db"
-      - checkout
-      - run:
-          # undo circle github setting so cargo checkouts work
-          name: Unset CircleCI's forced conversion of HTTPS->SSH
-          command: git config --global --unset "url.ssh://git@github.com.insteadof"
-      - run:
-          name: Setup
-          command: |
-            ci/vault-enable-transit
-      - run:
-          name: Build
-          command: |
-            cargo build --all
-      - run:
-          name: Test
-          command: |
-            cargo test --all
-            PROG=target/debug/encrypt ./examples/encrypt-rs/test-env
-            PROG=target/debug/encrypt ./examples/encrypt-rs/test-cloudkms
-            PROG=target/debug/encrypt ./examples/encrypt-rs/test-hashivault
-  
+      - build-test
+
+workflows:
+  default:
+    jobs:
+      - build:
+          matrix:
+            parameters:
+              mode: ["debug"]
+              rustver: ["stable"]
+  variants:
+    jobs:
+      - build:
+          matrix:
+            parameters:
+              mode: ["debug", "release"]
+              rustver: ["stable", "nightly"]
+
 
