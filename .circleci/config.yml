@@ -91,9 +91,9 @@ step-build-all: &step-build-all
     name: Build all packages
     command: |
       if [ "$BUILD_MODE" = "release" ]; then
-        cargo build --all --release
+        cargo build --workspace --release
       else
-        cargo build --all
+        cargo build --workspace
       fi
 
 step-setup-vault: &step-setup-vault
@@ -106,17 +106,12 @@ step-test-libs: &step-test-libs
   run:
     name: Test libs and docs
     command: |
-      if [ "$BUILD_MODE" = "release" ]; then
-        cargo build --all --release
-      else
-        cargo build --all
-      fi
+      cargo test --workspace
 
 step-test-encrypt-cli: &step-test-encrypt-cli
   run:
     name: Test encrypt cli
     command: |
-      cargo test --all
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-env
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-cloudkms
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-hashivault
@@ -132,23 +127,13 @@ step-cargo-audit: &step-cargo-audit
 step-show-config: &step-show-config
   run:
     name: Show build config
-    environment:
-      GIT_BRANCH: << pipeline.git.branch >>
-      GIT_REVISION: << pipeline.git.revision >>
-      PIPELINE_NUM: << pipeline.number >>
-      PIPELINE_ID: << pipeline.id >>
     command: |
       echo "Build mode:    $BUILD_MODE"
       echo "Rust channel:  $RUST_VER"
       echo "Rust release:  $(rustc --version)"
       echo "Debian:        $(cat /etc/debian_version)"
-      echo "Git branch:    $GIT_BRANCH"
-      echo "Git revision:  $GIT_REVISION"
-      echo "Pipeline id:   $PIPELINE_ID"
-      echo "Pipeline num:  $PIPELINE_NUMBER"
       #echo "Gcloud SDK:    $(gcloud --version)"
       #echo "Git user:      $(git config --get user.email)"
-
 
 executors:
   rust-docker:
