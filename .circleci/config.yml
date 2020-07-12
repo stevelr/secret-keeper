@@ -121,6 +121,14 @@ step-test-encrypt-cli: &step-test-encrypt-cli
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-cloudkms
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-hashivault
   
+step-cargo-audit: &step-cargo-audit
+  run:
+    name: RustSec Advisory Audit
+    command: |
+      cargo install --force cargo-audit
+      cargo generate-lockfile
+      cargo audit
+
 step-show-config: &step-show-config
   run:
     name: Show build config
@@ -166,19 +174,19 @@ commands:
   build-test:
     description: "Setup, build, and run all tests"
     steps:
+      - *step-local-net-config
+      - *step-ensure-libssl
+      - *step-gcloud-cli-install
+      - *step-gcloud-cli-init
+      - *step-verify-build-requirements
       - *step-show-config
-      #- *step-local-net-config
-      #- *step-ensure-libssl
-      #- *step-gcloud-cli-install
-      #- *step-gcloud-cli-init
-      #- *step-verify-build-requirements
       - *step-select-rustver
-      #- checkout
-      #- *step-fix-github
-      #- *step-setup-vault
-      #- *step-build-all
-      #- *step-test-libs
-      #- *step-run-encrypt-cli-tests
+      - checkout
+      - *step-fix-github
+      - *step-setup-vault
+      - *step-build-all
+      - *step-test-libs
+      - *step-test-encrypt-cli
   
 
 jobs:
@@ -202,6 +210,18 @@ jobs:
     steps:
       - build-test
 
+  sec-audit:
+    description: "Scan for reported vulnerabilities from RustSec Advisory Database"
+    executor:
+      name: rust-docker
+      img: "cimg/rust:latest"
+    steps:
+      #- *step-ensure-libssl
+      - checkout
+      - *step-fix-github
+      - *step-cargo-audit
+
+
 workflows:
   default:
     jobs:
@@ -210,6 +230,7 @@ workflows:
             parameters:
               mode: ["debug"]
               rustver: ["stable"]
+
   variants:
     jobs:
       - build:
@@ -217,5 +238,18 @@ workflows:
             parameters:
               mode: ["debug", "release"]
               rustver: ["stable", "nightly"]
+
+
+  # scan dependencies for reported vulnerabilities, daily
+  secaudit:
+    jobs:
+      - sec-audit
+    triggers:
+      - schedule:
+          cron: "0 18 * * *" # daily 6pm UTC 
+          filters:
+            branches:
+              only:
+                - master
 
 
