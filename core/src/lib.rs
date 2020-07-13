@@ -94,3 +94,6 @@ impl AuthTag {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod test_simple;
