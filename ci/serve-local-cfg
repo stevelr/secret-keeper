@@ -1,0 +1,51 @@
+#!/bin/sh
+set -e
+
+# This script is used to set secrets for circleci locally,
+# to match the behavior of circleci cloud service.
+#
+# Specifically, environment variable parameters aren't set locally.
+# Also, the google cloud sdk credentials are saved to ~/gcloud-service-key.json
+#
+# To accomplish that locally, we pass a url to the local docker executor
+# that contains a shell script that will define any secret environment
+# settings necessary, and also initialize ~/gcloud-service-key.json
+#
+# SECURITY WARNING:
+# Some secrets, such as the gcloud credentials, and any other
+# secrets in the config file, will be available to an unauthenticated http server.
+# It's running on an ip address that is local to the machine,
+# so this may only be suitable for running on developer machines.
+# To reduce the window when the secrets are available, the
+# http server is stopped after the circleci containers have completed.
+# (in the run script)
+
+. ci/local-env
+
+if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+  echo GOOGLE_APPLICATION_CREDENTIALS must be defined. Stopping.
+  exit 1
+fi
+
+# generate config file for serving
+OUT="$(mktemp)"
+PROJ=$(jq -r '.project_id' < $GOOGLE_APPLICATION_CREDENTIALS )
+CREDS=$(<$GOOGLE_APPLICATION_CREDENTIALS)
+
+# other secrets can be set below
+cat >>$OUT <<_EOF
+# local config bash script - automatically generated
+cat > \$HOME/gcloud-service-key.json <<_EKEY
+$CREDS
+_EKEY
+echo GOOGLE_PROJECT_ID=$PROJ >> \$BASH_ENV
+_EOF
+
+#docker rm -f $CONTAINER_NAME
+docker run -d --rm -it --name $CONTAINER_NAME \
+	-p $BIND_ADDR:$BIND_PORT:8000 \
+	-v $OUT:/www/local-cfg.sh:ro \
+	python:3-alpine \
+	python -m http.server --directory /www \
+	  --bind 0.0.0.0 8000
+

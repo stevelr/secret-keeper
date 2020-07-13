@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+. ci/local-env
+
+CONFIG_URL="http://${BIND_ADDR}:${BIND_PORT}/local-cfg.sh"
+
+# start container if it's not already running
+#nc -w 1 $DOCKER_IP $BIND_PORT || ci/serve-local-cfg
+container=$(docker ps -q -f "name=$CONTAINER_NAME")
+if [ -z "$container" ]; then
+	ci/serve-local-cfg
+fi
+
+circleci config pack .circleci > /tmp/pack.yml
+circleci config process /tmp/pack.yml > /tmp/process.yml
+circleci local execute -c /tmp/process.yml  \
+	-e "LOCAL_CONFIG_URL=$CONFIG_URL" --job build-debug-stable
+
+# stop server
+docker rm -f $CONTAINER_NAME
