@@ -1,4 +1,10 @@
+#  circleci config for secret-keeper
+#
 version: 2.1
+
+# ----------------------------
+# Steps
+# ----------------------------
 
 step-ensure-libssl: &step-ensure-libssl
   # needed to for compiling some rust dependencies on circleci debian image
@@ -39,11 +45,10 @@ step-local-net-config: &step-local-net-config
         bash /tmp/local_cfg.sh
       fi
 
-step-verify-build-requirements: &step-verify-build-requirements
+step-verify-build-settings: &step-verify-build-settings
   # perform sanity tests before we get started
-  # also check build variables
   run:
-    name: Verify build requirements
+    name: Verify build settings
     command: |
       [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
           && echo "Environment must define GOOGLE_APPLICATION_CREDENTIALS" && exit 1
@@ -53,11 +58,6 @@ step-verify-build-requirements: &step-verify-build-requirements
           && echo "Credentials file missing" && exit 1
       (command -v rustc) || ( echo "Rust not installed" && exit 1 )
       (command -v gcloud) || ( echo "Google Cloud SDK not installed" && exit 1 )
-      if [ -d /home/circleci/.ssh ]; then
-        ls -al /home/circleci/.ssh
-      else
-        echo no ssh folder
-      fi
       if [ "$BUILD_MODE" != "debug" ] && [ "$BUILD_MODE" != "release" ]; then
         echo "Invalid BUILD_MODE: should be 'debug' or 'release'"
         exit 1
@@ -65,15 +65,6 @@ step-verify-build-requirements: &step-verify-build-requirements
       if [ "$RUST_VER" != "stable" ] && [ "$RUST_VER" != "nightly" ]; then
         echo "Invalid RUST_VER: should be 'stable' or 'nightly'"
         exit 1
-      fi
-
-step-select-rustver: &step-select-rustver
-  run:
-    # use rust-stable (default) or switch to nightly
-    name: Select rust version
-    command: |
-      if [ "$RUST_VER" = "nightly" ]; then
-        rustup default nightly
       fi
 
 step-fix-github: &step-fix-github
@@ -115,7 +106,7 @@ step-test-encrypt-cli: &step-test-encrypt-cli
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-env
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-cloudkms
       PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-hashivault
-  
+
 step-cargo-audit: &step-cargo-audit
   run:
     name: RustSec Advisory Audit
@@ -135,6 +126,9 @@ step-show-config: &step-show-config
       #echo "Gcloud SDK:    $(gcloud --version)"
       #echo "Git user:      $(git config --get user.email)"
 
+# ----------------------------
+#  Docker images
+# ----------------------------
 executors:
   rust-docker:
     parameters:
@@ -155,6 +149,9 @@ executors:
           VAULT_TOKEN: root
 
 
+# ----------------------------
+#  Command pipelines
+# ----------------------------
 commands:
   build-test:
     description: "Setup, build, and run all tests"
@@ -163,17 +160,27 @@ commands:
       - *step-ensure-libssl
       - *step-gcloud-cli-install
       - *step-gcloud-cli-init
-      - *step-verify-build-requirements
+      - *step-verify-build-settings
       - *step-show-config
-      - *step-select-rustver
       - checkout
       - *step-fix-github
       - *step-setup-vault
       - *step-build-all
       - *step-test-libs
       - *step-test-encrypt-cli
-  
 
+  sec-audit:
+    description: "RustSec scan"
+    steps:
+      - *step-ensure-libssl
+      - checkout
+      - *step-fix-github
+      - *step-cargo-audit
+
+
+# ----------------------------
+#  Jobs
+# ----------------------------
 jobs:
   build:
     parameters:
@@ -181,11 +188,13 @@ jobs:
         type: string
         default: "cimg/rust:1.44"
       mode:
-        type: string
-        default: "debug"
+        type: enum
+        enum: [ debug, release ]
+        default: debug
       rustver:
-        type: string
-        default: "stable"
+        type: enum
+        enum: [ stable, nightly ]
+        default: stable
     executor:
       name: rust-docker
       img: << parameters.img >>
@@ -193,48 +202,52 @@ jobs:
       - BUILD_MODE: << parameters.mode >>
       - RUST_VER: << parameters.rustver >>
     steps:
+      - when:
+          condition:
+            equal: [ nightly, << parameters.rustver >> ]
+          steps:
+          - run: rustup default nightly
       - build-test
 
   sec-audit:
     description: "Scan for reported vulnerabilities from RustSec Advisory Database"
     executor:
       name: rust-docker
-      img: "cimg/rust:latest"
+      img: "cimg/rust:1.44"
     steps:
-      #- *step-ensure-libssl
-      - checkout
-      - *step-fix-github
-      - *step-cargo-audit
+      - sec-audit
 
 
+# ----------------------------
+#  Workflows
+# ----------------------------
 workflows:
   default:
     jobs:
       - build:
           matrix:
             parameters:
-              mode: ["debug"]
-              rustver: ["stable"]
+              mode: [ debug ]
+              rustver: [ stable ]
 
   variants:
     jobs:
       - build:
           matrix:
             parameters:
-              mode: ["debug", "release"]
-              rustver: ["stable", "nightly"]
+              mode: [ debug, release ]
+              rustver: [ stable, nightly ]
 
 
-  # scan dependencies for reported vulnerabilities, daily
+  # Daily scan for reported vulnerabilities
   secaudit:
     jobs:
       - sec-audit
     triggers:
       - schedule:
-          cron: "0 18 * * *" # daily 6pm UTC 
+          cron: "0 18 * * *" # 6pm UTC daily
           filters:
             branches:
               only:
                 - master
-
 
