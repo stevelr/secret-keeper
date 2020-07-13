@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# first arg is job name. If not specified, will use 'build-debug-stable'
+JOB=${1:-"build-debug-stable"}
+
 . ci/local-env
 
 CONFIG_URL="http://${BIND_ADDR}:${BIND_PORT}/local-cfg.sh"
@@ -15,7 +18,7 @@ fi
 circleci config pack .circleci > /tmp/pack.yml
 circleci config process /tmp/pack.yml > /tmp/process.yml
 circleci local execute -c /tmp/process.yml  \
-	-e "LOCAL_CONFIG_URL=$CONFIG_URL" --job build-debug-stable
+	-e "LOCAL_CONFIG_URL=$CONFIG_URL" --job "$JOB"
 
 # stop server
 docker rm -f $CONTAINER_NAME
