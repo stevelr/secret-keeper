@@ -1,0 +1,10 @@
+[package]
+name = "simple"
+version = "0.1.0"
+authors = ["stevelr <steve.schoettler@gmail.com>"]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+
+[dependencies]
+secret-keeper = { version = "0.3", path = "../../core" }
+tokio = { version = "", features = [ "rt-core" ] }

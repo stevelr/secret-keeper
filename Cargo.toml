@@ -5,6 +5,7 @@ members = [
 	"keepers/hashivault",
 	"keepers/cloudkms",
 	"test_util",
+	"examples/simple",
 	"examples/encrypt-rs",
 ]
 
