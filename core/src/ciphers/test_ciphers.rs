@@ -249,14 +249,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: Temporarily disabled - seal_open_detached isn't implemented for comp cipher yet
-    //#[tokio::test]
-    //async fn seal_open_detached_xchacha20_comp() -> Result<(), Error> {
-    //    let cipher = Box::new(XChaCha20Compress::init()?);
-    //    let _ = seal_open_detached(cipher).await?;
-    //    Ok(())
-    //}
-
     #[tokio::test]
     async fn file_seal_write_open_read_xchacha20_comp() -> Result<(), Error> {
         let cipher = Box::new(XChaCha20Compress::init()?);

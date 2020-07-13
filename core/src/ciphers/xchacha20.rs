@@ -184,8 +184,6 @@ impl Cipher for XChaCha20 {
             buf.as_mut(),
             GenericArray::from_slice(tag),
         )?;
-        //TODO: why no err?
-        // .map_err(|_| Error::DecryptionError(String::from("Invalid key or corrupt file")))?;
         Ok(buf.freeze())
     }
 
@@ -205,8 +203,6 @@ impl Cipher for XChaCha20 {
             buf,
             GenericArray::from_slice(tag),
         )?;
-        //TODO: why no err?
-        //.map_err(|_| Error::DecryptionError(String::from("Invalid key or corrupt file")))?;
         Ok(())
     }
 

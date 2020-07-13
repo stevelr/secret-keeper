@@ -171,8 +171,6 @@ impl Cipher for XChaCha20Compress {
         let mut compbuf = BytesMut::with_capacity(MIN_UNCOMPRESS_BUFSIZE);
         let _ = Compressor::new().from_buf(&plaintext, &mut compbuf);
         compbuf.reserve(TAGBYTES);
-
-        // TODO: add pull request for aead::Buffer to impl From<BytesMut>
         let tag =
             self.aead
                 .encrypt_in_place_detached(self.kbox.get_nonce(), &[], compbuf.as_mut())?;
@@ -250,7 +248,7 @@ impl Cipher for XChaCha20Compress {
         let _ = self.aead.decrypt_in_place_detached(
             self.kbox.get_nonce(),
             &[],
-            buf.as_mut(), // TODO: need to reset reader?
+            buf.as_mut(),
             GenericArray::from_slice(tag),
         )?;
         let mut decomp = BytesMut::with_capacity(match size_hint {

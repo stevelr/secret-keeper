@@ -35,7 +35,7 @@
 //! - __CloudKMS__ The CloudKmsKeeper uses keys in Google CloudKMS service.
 //!
 //! - __1Password__ (linux/mac only). 1Password is included in the example directory to show how
-//! external programs can be used with EnvKeeper and a shell script; no additionl rust code
+//! external programs can be used with EnvKeeper and a shell script; no additional rust code
 //! is required. Uses the free 1password
 //! [`op cli tool`](https://support.1password.com/command-line-getting-started/),
 //!
