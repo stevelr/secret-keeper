@@ -19,10 +19,10 @@ secret-keeper = { version = "0.3", path="../../core" }
 #
 async-trait = "0.1"
 bytes = "0.5"
-googapis = { version = "0.1.3", features = ["google-cloud-kms-v1"] }
-gouth = { version = "0.1.2" }
+googapis = { version = "0.1", features = ["google-cloud-kms-v1"] }
+gouth = { version = "0.1" }
 serde_urlencoded = "0.6"
-tonic = { version = "0.2", features = ["tls"] }
+tonic = { version = "0.2.1", features = ["tls"] }
 url = "2.1"
 
 
