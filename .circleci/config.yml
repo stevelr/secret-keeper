@@ -101,9 +101,7 @@ step-show-config: &step-show-config
       echo "Rust channel:  $RUST_VER"
       echo "Rust release:  $(rustc --version)"
       echo "Debian:        $(cat /etc/debian_version)"
-      if [ -z "$LOCAL_CONFIG_URL" ]; then
-        docker ps -a
-      fi
+      gcloud --version | grep SDK 2>&1
 
 
 # ----------------------------
