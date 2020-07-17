@@ -86,10 +86,9 @@ step-test-encrypt-cli: &step-test-encrypt-cli
   run:
     name: Test encrypt cli
     command: |
-      PROG=target/$BUILD_MODE/encrypt            \
-          ./examples/encrypt-rs/test-env         \
-          && ./examples/encrypt-rs/test-cloudkms \
-          && ./examples/encrypt-rs/test-hashivault
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-env
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-cloudkms
+      PROG=target/$BUILD_MODE/encrypt ./examples/encrypt-rs/test-hashivault
 
 step-cargo-audit: &step-cargo-audit
   run:
