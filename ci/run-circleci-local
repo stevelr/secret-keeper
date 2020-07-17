@@ -1,24 +1,71 @@
 #!/bin/sh
+#
+# Run circle ci scripts, adding environment vars so that it runs
+# more closely to the way it runs in the cloud.
+# This script generates a config file that is seved over http
+# so the docker ci runner can load it.
+# Also, if GOOGLE_APPLICATION_CREDENTIALS is defined, that file
+# is copied onto the ci container at ~/gcloud-service-key.json
+#
+# SECURITY WARNING:
+# Some secrets, such the gcloud credentials, and any other
+# secrets in the config file, will be available on an unauthenticated http server.
+# To mitigate the risk of unauthorized download of these secrets,
+# the server is bound to a private ip address which should be accessible
+# only to the localhost, and not other machines on the lan.
+# Additionally, to reduce the window when the server is running,
+# the server is stopped after the circleci pipeline completes.
 set -e
 
 # first arg is job name. If not specified, will use 'build-debug-stable'
 JOB=${1:-"build-debug-stable"}
 
-. ci/local-env
+BIND_PORT="9999"
+CONTAINER_NAME=ci-local-cfg
+DOCKER_IF=docker0
+BIND_ADDR=$(ip addr show $DOCKER_IF 2>/dev/null | grep -m 1 'inet ' | sed 's/^[[:space:]]*inet[[:space:]]*\([0-9\.]*\).*$/\1/')
 
 CONFIG_URL="http://${BIND_ADDR}:${BIND_PORT}/local-cfg.sh"
+# temporary location of the generated config
+# deleted after pipeline completes
+OUT=$(mktemp)
 
-# start container if it's not already running
-#nc -w 1 $DOCKER_IP $BIND_PORT || ci/serve-local-cfg
-container=$(docker ps -q -f "name=$CONTAINER_NAME")
-if [ -z "$container" ]; then
-	ci/serve-local-cfg
+# read environment secrets
+[ ! -f ./secret.env ] && echo missing './secret.env' && exit 1
+. ./secret.env
+
+# generate config file for serving
+sh ci/config-template.sh $OUT
+
+# if GOOGLE_APPLICATION_CREDENTIALS is defined on the host, the following code
+# causes the contents of that file 
+# to be copied to ~/gcloud-service-key.json on the ci runner image
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+  PROJ=$(jq -r '.project_id' < $GOOGLE_APPLICATION_CREDENTIALS )
+  CREDS=$(<$GOOGLE_APPLICATION_CREDENTIALS)
+  cat >>$OUT <<_GAC
+GOOGLE_PROJECT_ID="$PROJ"
+cat > \$HOME/gcloud-service-key.json <<_EKEY
+$CREDS
+_EKEY
+_GAC
 fi
 
-circleci config pack .circleci > /tmp/pack.yml
-circleci config process /tmp/pack.yml > /tmp/process.yml
-circleci local execute -c /tmp/process.yml  \
-	-e "LOCAL_CONFIG_URL=$CONFIG_URL" --job "$JOB"
+# start the lightweight http server
+docker run -d --rm --name $CONTAINER_NAME \
+	-p $BIND_ADDR:$BIND_PORT:80 \
+	-v $OUT:/public/local-cfg.sh:ro \
+    joseluisq/static-web-server:1 --name ci_config --assets /public
 
-# stop server
+
+set +e
+circleci config pack .circleci > /tmp/pack.yml \
+ && circleci config process /tmp/pack.yml > /tmp/process.yml \
+ && circleci local execute -c /tmp/process.yml  \
+	  -e "LOCAL_CONFIG_URL=$CONFIG_URL" --job "$JOB"
+
+# after pipeline has completed, stop config server
+# and delete the temporary config file
 docker rm -f $CONTAINER_NAME
+rm -f $OUT
+
