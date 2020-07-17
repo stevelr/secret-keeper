@@ -16,43 +16,48 @@ TEST_FILE=${1:-/etc/services}
 #     PROG           path to 'encrypt' binary, or will find it in $PATH
 
 [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] && echo "GOOGLE_APPLICATION_CREDENTIALS must be defined" && exit 1
+[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ] \
+	&& echo "GOOGLE_APPLICATION_CREDENTIALS points to invalid file $GOOGLE_APPLICATION_CREDENTIALS"\
+	&& exit 1
 KEYRING_NAME=${KEYRING_NAME:-"my_keyring"}
 KEY_NAME=${KEY_NAME:-"my_key"}
 KEY_LOCATION=${KEY_LOCATION:-"global"}
+# support use case when installed with 'cargo install encrypt-rs'
+# If run within ci, PROG will be defined by caller
 PROG=${PROG:-$(command -v encrypt)}
 
-# get the project name
-GCLOUD_PROJECT=$(gcloud config get-value project)
-if [ -z "$GCLOUD_PROJECT" ]; then
-	# try to get from credentials json
-    gcloud config set project $(jq -r ".project_id" $GOOGLE_APPLICATION_CREDENTIALS)
+if [ -z "$GOOGLE_PROJECT_ID" ]; then
+	GOOGLE_PROJECT_ID=$(jq -r ".project_id" $GOOGLE_APPLICATION_CREDENTIALS)
 fi
 
-# create the keyring if it doesn't exist
-echo Checking for keyring $KEYRING_NAME
-gcloud kms keyrings describe $KEYRING_NAME \
-	--project $GCLOUD_PROJECT \
-	--location $KEY_LOCATION \
-	>/dev/null 2>&1 \
-	|| gcloud kms keyrings create $KEYRING_NAME \
-		--project $GCLOUD_PROJECT \
-	    --location $KEY_LOCATION
+if $(command -v gcloud); then
+	# The following setup requires 'gcloud' from google-cloud-sdk
 
-# create key if it doesn't exist
-echo Checking for key $KEY_NAME
-gcloud kms keys describe $KEY_NAME \
-	--project $GCLOUD_PROJECT \
-	--location $KEY_LOCATION \
-	--keyring $KEYRING_NAME \
-	>/dev/null 2>&1 \
-	|| gcloud kms keys create $KEY_NAME \
-	    --project $GCLOUD_PROJECT \
-		--location $KEY_LOCATION \
-	    --keyring $KEYRING_NAME \
-		--purpose encryption
+    # create the keyring if it doesn't exist
+    echo Checking for keyring $KEYRING_NAME
+    gcloud kms keyrings describe $KEYRING_NAME \
+    	--project $GOOGLE_PROJECT_ID \
+    	--location $KEY_LOCATION \
+    	>/dev/null 2>&1 \
+    	|| gcloud kms keyrings create $KEYRING_NAME \
+    		--project $GOOGLE_PROJECT_ID \
+    	    --location $KEY_LOCATION
 
+    # create key if it doesn't exist
+    echo Checking for key $KEY_NAME
+    gcloud kms keys describe $KEY_NAME \
+    	--project $GOOGLE_PROJECT_ID \
+    	--location $KEY_LOCATION \
+    	--keyring $KEYRING_NAME \
+    	>/dev/null 2>&1 \
+    	|| gcloud kms keys create $KEY_NAME \
+    	    --project $GOOGLE_PROJECT_ID \
+    		--location $KEY_LOCATION \
+    	    --keyring $KEYRING_NAME \
+    		--purpose encryption
+fi
 
-KEEPER_URI="cloudkms:/$GCLOUD_PROJECT/$KEY_LOCATION/$KEYRING_NAME/$KEY_NAME"
+KEEPER_URI="cloudkms:/$GOOGLE_PROJECT_ID/$KEY_LOCATION/$KEYRING_NAME/$KEY_NAME"
 echo "Keeper uri: $KEEPER_URI"
 
 # temp file for encrypted output
