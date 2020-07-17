@@ -1,6 +1,0 @@
-# common settings for ci scripts
-# this file contains no secrets
-BIND_PORT="9999"
-CONTAINER_NAME=ci-local-cfg
-DOCKER_IF=docker0
-BIND_ADDR=$(ip addr show $DOCKER_IF 2>/dev/null | grep -m 1 'inet ' | sed 's/^[[:space:]]*inet[[:space:]]*\([0-9\.]*\).*$/\1/')
