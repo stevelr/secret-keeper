@@ -24,8 +24,6 @@ step-local-net-config: &step-local-net-config
         curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
         bash /tmp/local_cfg.sh
       fi
-      echo "new base-config: fname=$BASH_ENV"
-      cat "$BASH_ENV"
 
 step-fix-github: &step-fix-github
   run:
