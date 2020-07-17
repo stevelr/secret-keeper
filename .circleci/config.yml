@@ -1,26 +1,31 @@
 #  circleci config for secret-keeper
 #
 version: 2.1
+parameters:
+  rust_image: { type: string, default: "cimg/rust:1.45" }
+  vault_image: { type: string, default: "vault:1.4.2" }
+  google_sdk_version: { type: string, default: "301.0.0" }
 
 # ----------------------------
 # Steps
 # ----------------------------
 
 step-ensure-libssl: &step-ensure-libssl
-  # needed to for compiling some rust dependencies on circleci debian image
+  # needed for compiling some rust dependencies on circleci debian image
   #     (oath->ring, tokio/tls)
   run:
     name: Install libssl
     command: |
       sudo apt-get update \
           && sudo apt-get install -y pkg-config openssl libssl-dev
-
+ 
 step-gcloud-cli-install: &step-gcloud-cli-install
   # Install Google Cloud SDK (gcloud cli)
   run:
     name: Install gcloud
     command: |
-      curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz\
+      GOOGLE_SDK_VERSION=<< pipeline.parameters.google_sdk_version >>
+      curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_SDK_VERSION}-linux-x86_64.tar.gz\
          | (cd $HOME;  tar xz)
       echo 'export PATH=/home/circleci/google-cloud-sdk/bin:$PATH' >> $BASH_ENV
       if [ -n "$GCLOUD_SERVICE_KEY" ]; then
@@ -38,33 +43,11 @@ step-gcloud-cli-init: &step-gcloud-cli-init
 step-local-net-config: &step-local-net-config
   # import secrets when running locally
   run:
-    name: Get local config
+    name: Fetch local config
     command: |
       if [ -n "$LOCAL_CONFIG_URL" ]; then
         curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
         bash /tmp/local_cfg.sh
-      fi
-
-step-verify-build-settings: &step-verify-build-settings
-  # perform sanity tests before we get started
-  run:
-    name: Verify build settings
-    command: |
-      [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
-          && echo "Environment must define GOOGLE_APPLICATION_CREDENTIALS" && exit 1
-      [ -z "$GOOGLE_PROJECT_ID" ] \
-          && echo "Environment must define GOOGLE_PROJECT_ID" && exit 1
-      [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ] \
-          && echo "Credentials file missing" && exit 1
-      (command -v rustc) || ( echo "Rust not installed" && exit 1 )
-      (command -v gcloud) || ( echo "Google Cloud SDK not installed" && exit 1 )
-      if [ "$BUILD_MODE" != "debug" ] && [ "$BUILD_MODE" != "release" ]; then
-        echo "Invalid BUILD_MODE: should be 'debug' or 'release'"
-        exit 1
-      fi
-      if [ "$RUST_VER" != "stable" ] && [ "$RUST_VER" != "nightly" ]; then
-        echo "Invalid RUST_VER: should be 'stable' or 'nightly'"
-        exit 1
       fi
 
 step-fix-github: &step-fix-github
@@ -77,9 +60,9 @@ step-fix-github: &step-fix-github
         git config --global --unset "url.ssh://git@github.com.insteadof"
       fi
 
-step-build-all: &step-build-all
+step-build-workspace: &step-build-workspace
   run:
-    name: Build all packages
+    name: Build all packages in workspace
     command: |
       if [ "$BUILD_MODE" = "release" ]; then
         cargo build --workspace --release
@@ -123,8 +106,8 @@ step-show-config: &step-show-config
       echo "Rust channel:  $RUST_VER"
       echo "Rust release:  $(rustc --version)"
       echo "Debian:        $(cat /etc/debian_version)"
-      #echo "Gcloud SDK:    $(gcloud --version)"
-      #echo "Git user:      $(git config --get user.email)"
+      gcloud --version | grep SDK 2>&1
+
 
 # ----------------------------
 #  Docker images
@@ -134,14 +117,14 @@ executors:
     parameters:
       img:
         type: string
-        default: "cimg/rust:1.44"
+        default: << pipeline.parameters.rust_image >>
     docker:
       - image: << parameters.img >>
         environment:
           GOOGLE_APPLICATION_CREDENTIALS: /home/circleci/gcloud-service-key.json
           VAULT_ADDR: http://vault:8200/
           VAULT_TOKEN: root
-      - image: vault:1.4.2
+      - image: << pipeline.parameters.vault_image >>
         name: vault
         environment:
           VAULT_DEV_ROOT_TOKEN_ID: root
@@ -153,19 +136,17 @@ executors:
 #  Command pipelines
 # ----------------------------
 commands:
-  build-test:
+  build-and-test:
     description: "Setup, build, and run all tests"
     steps:
-      - *step-local-net-config
       - *step-ensure-libssl
       - *step-gcloud-cli-install
       - *step-gcloud-cli-init
-      - *step-verify-build-settings
       - *step-show-config
       - checkout
       - *step-fix-github
       - *step-setup-vault
-      - *step-build-all
+      - *step-build-workspace
       - *step-test-libs
       - *step-test-encrypt-cli
 
@@ -177,7 +158,6 @@ commands:
       - *step-fix-github
       - *step-cargo-audit
 
-
 # ----------------------------
 #  Jobs
 # ----------------------------
@@ -186,7 +166,7 @@ jobs:
     parameters:
       img:
         type: string
-        default: "cimg/rust:1.44"
+        default: << pipeline.parameters.rust_image >>
       mode:
         type: enum
         enum: [ debug, release ]
@@ -207,13 +187,19 @@ jobs:
             equal: [ nightly, << parameters.rustver >> ]
           steps:
           - run: rustup default nightly
-      - build-test
+      - when:
+          condition:
+            not:
+              equal: [ "", "$LOCAL_CONFIG_URL" ]
+          steps:
+          - *step-local-net-config
+      - build-and-test
 
   sec-audit:
     description: "Scan for reported vulnerabilities from RustSec Advisory Database"
     executor:
       name: rust-docker
-      img: "cimg/rust:1.44"
+      img: << pipeline.parameters.rust_image >>
     steps:
       - sec-audit
 
