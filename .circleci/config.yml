@@ -7,33 +7,13 @@ version: 2.1
 # ----------------------------
 
 step-ensure-libssl: &step-ensure-libssl
-  # needed to for compiling some rust dependencies on circleci debian image
+  # needed for compiling some rust dependencies on circleci debian image
   #     (oath->ring, tokio/tls)
   run:
     name: Install libssl
     command: |
       sudo apt-get update \
           && sudo apt-get install -y pkg-config openssl libssl-dev
-
-step-gcloud-cli-install: &step-gcloud-cli-install
-  # Install Google Cloud SDK (gcloud cli)
-  run:
-    name: Install gcloud
-    command: |
-      curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz\
-         | (cd $HOME;  tar xz)
-      echo 'export PATH=/home/circleci/google-cloud-sdk/bin:$PATH' >> $BASH_ENV
-      if [ -n "$GCLOUD_SERVICE_KEY" ]; then
-        echo "$GCLOUD_SERVICE_KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
-      fi
-
-step-gcloud-cli-init: &step-gcloud-cli-init
-  # Initialize Google Cloud SDK (gcloud cli)
-  run:
-    name: Initialize gcloud
-    command: |
-      gcloud auth activate-service-account "--key-file=$GOOGLE_APPLICATION_CREDENTIALS"
-      gcloud config set project $GOOGLE_PROJECT_ID --installation
 
 step-local-net-config: &step-local-net-config
   # import secrets when running locally
@@ -44,28 +24,8 @@ step-local-net-config: &step-local-net-config
         curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
         bash /tmp/local_cfg.sh
       fi
-
-step-verify-build-settings: &step-verify-build-settings
-  # perform sanity tests before we get started
-  run:
-    name: Verify build settings
-    command: |
-      [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
-          && echo "Environment must define GOOGLE_APPLICATION_CREDENTIALS" && exit 1
-      [ -z "$GOOGLE_PROJECT_ID" ] \
-          && echo "Environment must define GOOGLE_PROJECT_ID" && exit 1
-      [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ] \
-          && echo "Credentials file missing" && exit 1
-      (command -v rustc) || ( echo "Rust not installed" && exit 1 )
-      (command -v gcloud) || ( echo "Google Cloud SDK not installed" && exit 1 )
-      if [ "$BUILD_MODE" != "debug" ] && [ "$BUILD_MODE" != "release" ]; then
-        echo "Invalid BUILD_MODE: should be 'debug' or 'release'"
-        exit 1
-      fi
-      if [ "$RUST_VER" != "stable" ] && [ "$RUST_VER" != "nightly" ]; then
-        echo "Invalid RUST_VER: should be 'stable' or 'nightly'"
-        exit 1
-      fi
+      echo "new base-config: fname=$BASH_ENV"
+      cat "$BASH_ENV"
 
 step-fix-github: &step-fix-github
   run:
@@ -123,8 +83,15 @@ step-show-config: &step-show-config
       echo "Rust channel:  $RUST_VER"
       echo "Rust release:  $(rustc --version)"
       echo "Debian:        $(cat /etc/debian_version)"
-      #echo "Gcloud SDK:    $(gcloud --version)"
-      #echo "Git user:      $(git config --get user.email)"
+
+
+
+# ----------------------------
+#  Orbs
+# ----------------------------
+orbs:
+  gcp-cli: circleci/gcp-cli@1.8
+
 
 # ----------------------------
 #  Docker images
@@ -156,11 +123,8 @@ commands:
   build-test:
     description: "Setup, build, and run all tests"
     steps:
-      - *step-local-net-config
       - *step-ensure-libssl
-      - *step-gcloud-cli-install
-      - *step-gcloud-cli-init
-      - *step-verify-build-settings
+      - *step-local-net-config
       - *step-show-config
       - checkout
       - *step-fix-github
@@ -177,6 +141,33 @@ commands:
       - *step-fix-github
       - *step-cargo-audit
 
+  step-create-cloudkms-key:
+    steps:
+      - run:
+          command: |
+            # create keyring if it doesn't exist
+            if [ -n "$CLOUDKMS_KEYRING_NAME" ]; then
+              gcloud kms keyrings describe $CLOUDKMS_KEYRING_NAME \
+                --project $GCLOUD_PROJECT_ID \
+                --location $GCLOUD_COMPUTE_ZONE \
+                >/dev/null 2>&1 \
+                || gcloud kms keyrings create $CLOUDKMS_KEYRING_NAME \
+                --project $GCLOUD_PROJECT_ID \
+                --location $GCLOUD_COMPUTE_ZONE
+            fi
+            # create key if it doesn't exist
+            if [ -n "$CLOUDKMS_KEY_NAME" ]; then
+              gcloud kms keys describe $CLOUDKMS_KEY_NAME \
+                --project $GCLOUD_PROJECT_ID \
+                --location $GCLOUD_COMPUTE_ZONE \
+                --keyring $CLOUDKMS_KEYRING_NAME \
+                >/dev/null 2>&1 \
+                || gcloud kms keys create $CLOUDKMS_KEY_NAME \
+                --project $GCLOUD_PROJECT_ID \
+                --location $GCLOUD_COMPUTE_ZONE \
+                --keyring $CLOUDKMS_KEYRING_NAME \
+                --purpose encryption
+            fi
 
 # ----------------------------
 #  Jobs
@@ -209,6 +200,17 @@ jobs:
           - run: rustup default nightly
       - build-test
 
+  # init cloudkms keyring and key; runs inside separate gcloud sdk docker
+  cloudkms_setup:
+    description: Initialize gcloud sdk and cloudkms keys
+    executor: gcp-cli/default
+    steps:
+      - gcp-cli/install:
+          version: 300.0.0
+      - gcp-cli/initialize
+      - step-create-cloudkms-key
+
+
   sec-audit:
     description: "Scan for reported vulnerabilities from RustSec Advisory Database"
     executor:
@@ -224,6 +226,7 @@ jobs:
 workflows:
   default:
     jobs:
+      - cloudkms_setup
       - build:
           matrix:
             parameters:
