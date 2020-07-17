@@ -96,13 +96,18 @@ impl CloudKmsKeeper {
     }
 
     async fn service_connect(&self) -> Result<KeyManagementServiceClient<Channel>, Error> {
-        let token_header = self.token.header_value().unwrap();
+        let token_header = self.token.header_value().map_err(|e| {
+            Error::OtherError(format!(
+                "Invalid auth token in credentials file: {}",
+                e.to_string()
+            ))
+        })?;
         let tls_config = ClientTlsConfig::new()
             .ca_certificate(Certificate::from_pem(CERTIFICATES))
             .domain_name(CLOUDKMS_DOMAIN);
         let channel = Channel::from_static(CLOUDKMS_ENDPOINT)
             .tls_config(tls_config)
-            .map_err(|e| Error::OtherError(format!("Service error: {}", e.to_string())))?
+            //.map_err(|e| Error::OtherError(format!("Service error: {}", e.to_string())))?
             .connect()
             .await
             .map_err(|e| Error::OtherError(format!("Service connect error: {}", e.to_string())))?;
