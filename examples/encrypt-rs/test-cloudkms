@@ -11,10 +11,10 @@ TEST_FILE=${1:-/etc/services}
 # Required environment:
 #     GOOGLE_APPLICATION_CREDENTIALS must be set in environment to a valid json credentials file
 # Optional
-#     KEYRING_NAME   key ring, default "my_keyring"
-#     KEY_NAME       key name, default "my_key"
-#     KEY_LOCATION   key location (zone), default "global"
-#     PROG           path to 'encrypt' binary, or will find it in $PATH
+#     CLOUDKMS_KEYRING_NAME   key ring name, default "my_keyring"
+#     CLOUDKMS_KEY_NAME       key name, default "my_key"
+#     KEY_LOCATION            key location (zone), default "global"
+#     PROG                    path to 'encrypt' binary, or will find it in $PATH
 
 [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] \
     && echo "GOOGLE_APPLICATION_CREDENTIALS must be defined" \
@@ -26,8 +26,8 @@ TEST_FILE=${1:-/etc/services}
     && echo "gcloud is missing. The google-cloud-sdk-bin should be installed and initialized"\
     && exit 1
 
-KEYRING_NAME=${KEYRING_NAME:-"my_keyring"}
-KEY_NAME=${KEY_NAME:-"my_key"}
+KEYRING_NAME=${CLOUDKMS_KEYRING_NAME:-"my_keyring"}
+KEY_NAME=${CLOUDKMS_KEY_NAME:-"my_key"}
 KEY_LOCATION=${KEY_LOCATION:-"global"}
 # support use case when installed with 'cargo install encrypt-rs'
 # If run within ci, PROG will be defined by caller
