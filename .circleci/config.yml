@@ -14,11 +14,31 @@ step-ensure-libssl: &step-ensure-libssl
     command: |
       sudo apt-get update \
           && sudo apt-get install -y pkg-config openssl libssl-dev
+ 
+step-gcloud-cli-install: &step-gcloud-cli-install
+  # Install Google Cloud SDK (gcloud cli)
+  run:
+    name: Install gcloud
+    command: |
+      curl -sS https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-300.0.0-linux-x86_64.tar.gz\
+         | (cd $HOME;  tar xz)
+      echo 'export PATH=/home/circleci/google-cloud-sdk/bin:$PATH' >> $BASH_ENV
+      if [ -n "$GCLOUD_SERVICE_KEY" ]; then
+        echo "$GCLOUD_SERVICE_KEY" > "$GOOGLE_APPLICATION_CREDENTIALS"
+      fi
+
+step-gcloud-cli-init: &step-gcloud-cli-init
+  # Initialize Google Cloud SDK (gcloud cli)
+  run:
+    name: Initialize gcloud
+    command: |
+      gcloud auth activate-service-account "--key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+      gcloud config set project $GOOGLE_PROJECT_ID --installation
 
 step-local-net-config: &step-local-net-config
   # import secrets when running locally
   run:
-    name: Get local config
+    name: Fetch local config
     command: |
       if [ -n "$LOCAL_CONFIG_URL" ]; then
         curl -sS -o /tmp/local_cfg.sh "$LOCAL_CONFIG_URL"
@@ -81,14 +101,14 @@ step-show-config: &step-show-config
       echo "Rust channel:  $RUST_VER"
       echo "Rust release:  $(rustc --version)"
       echo "Debian:        $(cat /etc/debian_version)"
-
+      if [ -z "$LOCAL_CONFIG_URL" ]; then
+        docker ps -a
+      fi
 
 
 # ----------------------------
 #  Orbs
 # ----------------------------
-orbs:
-  gcp-cli: circleci/gcp-cli@1.8
 
 
 # ----------------------------
@@ -118,11 +138,12 @@ executors:
 #  Command pipelines
 # ----------------------------
 commands:
-  build-test:
+  build-and-test:
     description: "Setup, build, and run all tests"
     steps:
       - *step-ensure-libssl
-      - *step-local-net-config
+      - *step-gcloud-cli-install
+      - *step-gcloud-cli-init
       - *step-show-config
       - checkout
       - *step-fix-github
@@ -138,34 +159,6 @@ commands:
       - checkout
       - *step-fix-github
       - *step-cargo-audit
-
-  step-create-cloudkms-key:
-    steps:
-      - run:
-          command: |
-            # create keyring if it doesn't exist
-            if [ -n "$CLOUDKMS_KEYRING_NAME" ]; then
-              gcloud kms keyrings describe $CLOUDKMS_KEYRING_NAME \
-                --project $GCLOUD_PROJECT_ID \
-                --location $GCLOUD_COMPUTE_ZONE \
-                >/dev/null 2>&1 \
-                || gcloud kms keyrings create $CLOUDKMS_KEYRING_NAME \
-                --project $GCLOUD_PROJECT_ID \
-                --location $GCLOUD_COMPUTE_ZONE
-            fi
-            # create key if it doesn't exist
-            if [ -n "$CLOUDKMS_KEY_NAME" ]; then
-              gcloud kms keys describe $CLOUDKMS_KEY_NAME \
-                --project $GCLOUD_PROJECT_ID \
-                --location $GCLOUD_COMPUTE_ZONE \
-                --keyring $CLOUDKMS_KEYRING_NAME \
-                >/dev/null 2>&1 \
-                || gcloud kms keys create $CLOUDKMS_KEY_NAME \
-                --project $GCLOUD_PROJECT_ID \
-                --location $GCLOUD_COMPUTE_ZONE \
-                --keyring $CLOUDKMS_KEYRING_NAME \
-                --purpose encryption
-            fi
 
 # ----------------------------
 #  Jobs
@@ -196,18 +189,13 @@ jobs:
             equal: [ nightly, << parameters.rustver >> ]
           steps:
           - run: rustup default nightly
-      - build-test
-
-  # init cloudkms keyring and key; runs inside separate gcloud sdk docker
-  cloudkms_setup:
-    description: Initialize gcloud sdk and cloudkms keys
-    executor: gcp-cli/default
-    steps:
-      - gcp-cli/install:
-          version: 300.0.0
-      - gcp-cli/initialize
-      - step-create-cloudkms-key
-
+      - when:
+          condition:
+            not:
+              equal: [ "", "$LOCAL_CONFIG_URL" ]
+          steps:
+          - *step-local-net-config
+      - build-and-test
 
   sec-audit:
     description: "Scan for reported vulnerabilities from RustSec Advisory Database"
@@ -224,7 +212,6 @@ jobs:
 workflows:
   default:
     jobs:
-      - cloudkms_setup
       - build:
           matrix:
             parameters:
