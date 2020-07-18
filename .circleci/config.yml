@@ -38,6 +38,9 @@ step-gcloud-cli-init: &step-gcloud-cli-init
     name: Initialize gcloud
     command: |
       gcloud auth activate-service-account "--key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+      if [ -z "$GOOGLE_PROJECT_ID" ]; then
+        GOOGLE_PROJECT_ID=$(jq -r ".project_id" $GOOGLE_APPLICATION_CREDENTIALS)
+      fi
       gcloud config set project $GOOGLE_PROJECT_ID --installation
 
 step-local-net-config: &step-local-net-config
@@ -158,6 +161,19 @@ commands:
       - *step-fix-github
       - *step-cargo-audit
 
+  cli-install:
+    description: "Install encrypt cli binary"
+    steps:
+      # first: install and quick test on clean system
+      - *step-ensure-libssl
+      - run: cargo install encrypt-rs
+      - run: /home/circleci/.cargo/bin/encrypt --version
+      # then, checkout to get test program
+      - checkout
+      - *step-fix-github
+      - run: |
+          PROG=$HOME/.cargo/bin/encrypt ./examples/encrypt-rs/test-env
+
 # ----------------------------
 #  Jobs
 # ----------------------------
@@ -203,6 +219,14 @@ jobs:
     steps:
       - sec-audit
 
+  encrypt-cli:
+    description: test binary install for encrypt cli
+    executor:
+      name: rust-docker
+      img: << pipeline.parameters.rust_image >>
+    steps:
+      - cli-install
+
 
 # ----------------------------
 #  Workflows
@@ -224,6 +248,9 @@ workflows:
               mode: [ debug, release ]
               rustver: [ stable, nightly ]
 
+  encrypt-cli:
+    jobs:
+      - encrypt-cli
 
   # Daily scan for reported vulnerabilities
   secaudit:
