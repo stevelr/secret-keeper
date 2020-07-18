@@ -3,7 +3,8 @@ use clap::Clap;
 use secret_keeper::ciphers::CipherKind;
 
 #[derive(Clap, Clone, Debug)]
-#[clap(name = "encrypt")]
+#[clap(name = "encrypt", version)]
+// derive version from Cargo.toml
 pub struct Main {
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[clap(short, long, parse(from_occurrences))]
