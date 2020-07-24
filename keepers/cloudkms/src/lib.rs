@@ -107,7 +107,7 @@ impl CloudKmsKeeper {
             .domain_name(CLOUDKMS_DOMAIN);
         let channel = Channel::from_static(CLOUDKMS_ENDPOINT)
             .tls_config(tls_config)
-            //.map_err(|e| Error::OtherError(format!("Service error: {}", e.to_string())))?
+            .map_err(|e| Error::OtherError(format!("Service error: {}", e.to_string())))?
             .connect()
             .await
             .map_err(|e| Error::OtherError(format!("Service connect error: {}", e.to_string())))?;
