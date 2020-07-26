@@ -46,8 +46,6 @@ pub struct CloudKmsKeeper {
     token: Token,
 }
 
-unsafe impl Sync for CloudKmsKeeper {}
-
 /// Implement Display that skips Token
 impl fmt::Display for CloudKmsKeeper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
