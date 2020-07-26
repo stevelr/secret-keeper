@@ -16,6 +16,7 @@ exclude = [
 
 [dependencies]
 secret-keeper = { version="0.3", path="../../core" }
+secret-keeper-test_util = { version="0.3", path="../../test_util" }
 #
 async-trait = "0.1"
 base64 = "0.12"

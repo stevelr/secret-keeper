@@ -7,8 +7,9 @@ use random_fast_rng::{FastRng, Random};
 use secret_keeper::{
     error::{Error, Result},
     keepers::SecretKeeper,
-    util::{getenv, getenv_default, uninitialized_bytes},
+    util::{getenv, getenv_default},
 };
+use secret_keeper_test_util::uninitialized_bytes;
 use std::env;
 use std::sync::Mutex;
 
