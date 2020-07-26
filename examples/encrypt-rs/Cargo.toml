@@ -15,7 +15,7 @@ exclude = [
 ]
 
 [dependencies]
-secret-keeper = { version = "0.3", path = "../../core" }
+secret-keeper = { version = "0.3", features=["full"], path = "../../core" }
 secret-keeper-prompt = { version = "0.3", optional = true, path = "../../keepers/prompt"}
 secret-keeper-hashivault = { version = "0.3", optional = true, path = "../../keepers/hashivault"}
 secret-keeper-cloudkms = { version = "^0.3.6", optional = true, path = "../../keepers/cloudkms"}

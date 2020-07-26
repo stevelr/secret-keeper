@@ -62,9 +62,7 @@ use options::{
 use secret_keeper::{
     ciphers::{xchacha20_comp::TAGBYTES, CipherKind},
     keepers::SecretKeeper,
-    rand,
-    util::uninitialized_bytes,
-    WrappedKey,
+    rand, WrappedKey,
 };
 #[cfg(feature = "cloudkms")]
 use secret_keeper_cloudkms::CloudKmsKeeper;
@@ -190,13 +188,13 @@ pub(crate) async fn encrypt_file(opt: &EncryptOptions) -> Result<(), Error> {
 /// load header and wrapped key
 /// after loading, file reader is positioned at the start of the encrypted file blob
 async fn load_header(file: &mut File) -> Result<(EncHeader, WrappedKey), Error> {
-    let mut hdr_buf = uninitialized_bytes(HEADER_LEN);
+    let mut hdr_buf = vec![0; HEADER_LEN];
     let _ = file.read_exact(&mut hdr_buf).await?;
     let header: EncHeader = bincode::deserialize(&hdr_buf)?;
     if header.format_version != FORMAT_VERSION || !MAGIC.eq(&header.magic[..MAGIC.len()]) {
         return Err(Error::InvalidFile(String::from("")));
     }
-    let mut key_buf = uninitialized_bytes(header.envelope_size as usize);
+    let mut key_buf = vec![0; header.envelope_size as usize];
     let _ = file.read_exact(&mut key_buf).await?;
     let envelope: WrappedKey = bincode::deserialize(&key_buf)?;
     Ok((header, envelope))
