@@ -10,6 +10,8 @@
 //! LZ4 compression algorithm is a pure rust implementation by
 //! [`lz_fear`](https://crates.io/crates/lz-fear).
 
+#[cfg(feature = "fileio")]
+use crate::ciphers::read_file;
 use crate::{
     cipher_impl, cipher_keybox,
     ciphers::{Cipher, CompressingCipher, Import},
@@ -17,7 +19,7 @@ use crate::{
     error::{Error, Result},
     keepers::SecretKeeper,
     rand,
-    util::{self, Compressor, Uncompressor},
+    util::{Compressor, Uncompressor},
     AuthTag, WrappedKey,
 };
 use async_trait::async_trait;
@@ -25,8 +27,8 @@ use bytes::{Bytes, BytesMut};
 use chacha20poly1305::aead::{generic_array::GenericArray, Aead, AeadInPlace, NewAead};
 use chacha20poly1305::XChaCha20Poly1305 as pxchacha;
 use std::fmt;
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(feature = "fileio")]
+use tokio::{fs::File, io::AsyncWriteExt};
 use typenum::{U24, U32};
 use zeroize::Zeroize;
 
@@ -194,6 +196,8 @@ impl Cipher for XChaCha20Compress {
     }
 
     /// Compress and encrypt the file, with optional associated data.
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn seal_file(
         &self,
         file_path: &str,
@@ -213,6 +217,8 @@ impl Cipher for XChaCha20Compress {
     }
 
     /// Encrypt the data and append to the file. Returns the auth tag and length of data appended
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn seal_write(
         &self,
         data: &mut [u8],
@@ -235,6 +241,7 @@ impl Cipher for XChaCha20Compress {
     /// Read len bytes from the file and decrypt
     /// Returns data as Bytes. In compressing cipher, size_hint should be used
     /// if size of decompressed data is known.
+    #[cfg(feature = "fileio")]
     async fn open_read(
         &self,
         file: &mut File,
@@ -243,8 +250,7 @@ impl Cipher for XChaCha20Compress {
         tag: &[u8],
         _aad: Option<&[u8]>,
     ) -> Result<Bytes, Error> {
-        let mut buf = util::uninitialized_bytes(len as usize);
-        let _ = file.read_exact(buf.as_mut()).await?;
+        let mut buf = read_file(file, len as usize).await?;
         let _ = self.aead.decrypt_in_place_detached(
             self.kbox.get_nonce(),
             &[],

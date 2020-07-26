@@ -49,6 +49,11 @@ Crypto algorithms used are implemented by other packages, notably
 
 LZ4 compression is a pure rust implementation by [`lz_fear`](https://crates.io/crates/lz-fear).
 
+There is one use of 'unsafe' for allocating an uninitialized buffer
+before filling it with a file read. If the `fileio` feature is disabled
+(compile with --no-default-features --features=slim), unsafe code
+is not used directly by the secret-keeper crate.
+
 The concept for this library is based on the google cloud secret-keeper library
 
 ## Status

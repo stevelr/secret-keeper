@@ -3,13 +3,15 @@
 //! XChaCha20-Poly1305 encryption cipher
 //!
 
+#[cfg(feature = "fileio")]
+use crate::ciphers::read_file;
 use crate::{
     cipher_impl, cipher_keybox,
     ciphers::{Cipher, Import},
     clone_slice,
     error::{Error, Result},
     keepers::SecretKeeper,
-    rand, util, AuthTag, WrappedKey,
+    rand, AuthTag, WrappedKey,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -17,8 +19,11 @@ use chacha20poly1305::aead::{generic_array::GenericArray, Aead, AeadInPlace, New
 use chacha20poly1305::XChaCha20Poly1305 as pxchacha;
 use hex;
 use std::fmt;
-use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(feature = "fileio")]
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+};
 use typenum::{U24, U32};
 use zeroize::Zeroize;
 
@@ -130,6 +135,8 @@ impl Cipher for XChaCha20 {
 
     /// Encrypts the file, with optional associated data,
     /// Returns encrypted data, tag, and file size
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn seal_file(
         &self,
         file_path: &str,
@@ -149,6 +156,8 @@ impl Cipher for XChaCha20 {
     }
 
     /// Encrypt the data and append to the file. Returns the auth tag and length of data appended
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn seal_write(
         &self,
         data: &mut [u8],
@@ -168,6 +177,7 @@ impl Cipher for XChaCha20 {
     /// Read len bytes from the file and decrypt
     /// Returns data as Bytes
     /// In non-compressing cipher, data.len() == len, so size_hint is ignored.
+    #[cfg(feature = "fileio")]
     async fn open_read(
         &self,
         file: &mut File,
@@ -176,8 +186,7 @@ impl Cipher for XChaCha20 {
         tag: &[u8],
         _aad: Option<&[u8]>,
     ) -> Result<Bytes, Error> {
-        let mut buf = util::uninitialized_bytes(len as usize);
-        let _ = file.read_exact(buf.as_mut()).await?;
+        let mut buf = read_file(file, len as usize).await?;
         self.aead.decrypt_in_place_detached(
             self.kbox.get_nonce(),
             &[],

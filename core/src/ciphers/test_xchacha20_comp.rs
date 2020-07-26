@@ -4,7 +4,6 @@ mod tests {
     use crate::{
         ciphers::{xchacha20_comp::XChaCha20Compress, Cipher, CompressingCipher},
         error::{Error, Result},
-        util::uninitialized_vec,
     };
     use bytes::BytesMut;
     use hex;
@@ -37,8 +36,8 @@ mod tests {
 
         // generate buffer and make backup copy since it will be modified
         let mut plaintext = random_bytes(DATA_SIZE);
-        let mut backup = uninitialized_vec(DATA_SIZE);
-        backup.copy_from_slice(&plaintext);
+        let mut backup = Vec::with_capacity(DATA_SIZE);
+        backup.extend_from_slice(&plaintext);
 
         printbuf(&plaintext, "sod plain ");
         printbuf(&backup, "sod backup");

@@ -3,13 +3,15 @@
 pub mod aesgcm256 {
 
     // `RUSTFLAGS="-Ctarget-cpu=sandybridge -Ctarget-feature=+aes,+sse2,+sse4.1,+ssse3"`
+    #[cfg(feature = "fileio")]
+    use crate::ciphers::read_file;
     use crate::{
         cipher_impl, cipher_keybox,
         ciphers::{Cipher, Import},
         clone_slice,
         error::{Error, Result},
         keepers::SecretKeeper,
-        rand, util, AuthTag, WrappedKey,
+        rand, AuthTag, WrappedKey,
     };
     //use aes_gcm::aead::heapless::Vec;
     use aes_gcm::{
@@ -20,8 +22,11 @@ pub mod aesgcm256 {
     use bytes::Bytes;
     use hex;
     use std::fmt;
-    use tokio::fs::{self, File};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    #[cfg(feature = "fileio")]
+    use tokio::{
+        fs::{self, File},
+        io::AsyncWriteExt,
+    };
     use typenum::{U12, U32};
     use zeroize::Zeroize;
 
@@ -145,6 +150,8 @@ pub mod aesgcm256 {
 
         /// Encrypts the file, with optional associated data,
         /// Returns encrypted data, tag, and file size
+        /// (requires "fileio" feature)
+        #[cfg(feature = "fileio")]
         async fn seal_file(
             &self,
             file_path: &str,
@@ -168,6 +175,8 @@ pub mod aesgcm256 {
         }
 
         /// Encrypt the data and append to the file. Returns the auth tag and length of data appended
+        /// (requires "fileio" feature, included in default)
+        #[cfg(feature = "fileio")]
         async fn seal_write(
             &self,
             mut data: &mut [u8],
@@ -191,6 +200,8 @@ pub mod aesgcm256 {
         /// Read len bytes from the file and decrypt
         /// Returns data as Bytes
         /// In non-compressing cipher, data.len() == len, so size_hint is ignored.
+        /// (requires "fileio" feature, included in default)
+        #[cfg(feature = "fileio")]
         async fn open_read(
             &self,
             file: &mut File,
@@ -203,8 +214,7 @@ pub mod aesgcm256 {
                 Some(a) => a,
                 None => &[],
             };
-            let mut buf = util::uninitialized_bytes(len as usize);
-            let _ = file.read_exact(buf.as_mut()).await?;
+            let mut buf = read_file(file, len as usize).await?;
             self.aesgcm.decrypt_in_place_detached(
                 self.kbox.get_nonce(),
                 aad,

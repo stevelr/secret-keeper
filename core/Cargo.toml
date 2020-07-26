@@ -15,6 +15,14 @@ exclude = [
   ".gitignore"
 ]
 
+# to disable fileio, use cargo build --no-default-features --features="slim"
+[features]
+default = ["fileio"]
+full = ["fileio"]
+fileio = []
+slim = []
+
+
 [dependencies]
 aead = "0.3"
 aes-gcm = { version = "0.6", features = [ "heapless"] }
@@ -38,6 +46,7 @@ tokio = { version = "0.2", features = ["fs", "io-util", "macros", "rt-core", "sy
 typenum = "1.12"
 url = "2.1"
 zeroize = { version = "1.1", features = [ "zeroize_derive"]}
+
 
 [dev-dependencies]
 bincode = "1.2"

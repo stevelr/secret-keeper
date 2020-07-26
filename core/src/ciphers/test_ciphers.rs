@@ -14,14 +14,19 @@ mod tests {
         },
         error::{Error, Result},
         keepers::SecretKeeper,
-        util::{uninitialized_bytes, uninitialized_vec},
     };
     use bytes::Bytes;
+    #[cfg(feature = "fileio")]
+    use bytes::BytesMut;
+    #[cfg(feature = "fileio")]
     use random_fast_rng::FastRng;
-    use secret_keeper_test_util::{arrays_eq, random_bytes, random_fill_text};
+    use secret_keeper_test_util::{arrays_eq, random_bytes};
+    #[cfg(feature = "fileio")]
+    use secret_keeper_test_util::{random_fill_text, uninitialized_bytes};
     use std::borrow::Borrow;
     use std::str::FromStr;
     use std::sync::Arc;
+    #[cfg(feature = "fileio")]
     use tokio::fs::File;
 
     const DATA_SIZE: usize = 1024;
@@ -98,8 +103,8 @@ mod tests {
     async fn seal_open_detached(cipher: Box<dyn Cipher>) -> Result<(), Error> {
         // generate buffer and make backup copy since it will be modified
         let mut plaintext = random_bytes(DATA_SIZE);
-        let mut backup = uninitialized_vec(DATA_SIZE);
-        backup.copy_from_slice(&plaintext);
+        let mut backup = Vec::new();
+        backup.extend_from_slice(&plaintext);
 
         assert!(arrays_eq(&plaintext, &backup));
 
@@ -111,6 +116,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "fileio")]
     async fn file_seal_unseal(cipher: Box<dyn Cipher>) -> Result<(), Error> {
         const BUF_LEN: usize = 4096;
         let mut rng = FastRng::new();
@@ -118,8 +124,8 @@ mod tests {
         let mut word_buf = uninitialized_bytes(BUF_LEN);
         random_fill_text(&mut rng, &mut word_buf);
 
-        let mut copy_buf = uninitialized_bytes(BUF_LEN);
-        copy_buf.copy_from_slice(&word_buf);
+        let mut copy_buf = BytesMut::new();
+        copy_buf.extend_from_slice(&word_buf);
 
         let fpath = mktemp::Temp::new_path();
         let mut test_out = File::create(&fpath).await?;
@@ -214,6 +220,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "fileio")]
     #[tokio::test]
     async fn file_seal_write_open_read_xchacha20() -> Result<(), Error> {
         let cipher = Box::new(XChaCha20::init()?);
@@ -249,6 +256,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "fileio")]
     #[tokio::test]
     async fn file_seal_write_open_read_xchacha20_comp() -> Result<(), Error> {
         let cipher = Box::new(XChaCha20Compress::init()?);
@@ -291,6 +299,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "fileio")]
     #[tokio::test]
     async fn file_seal_write_open_read_aesgcm256() -> Result<(), Error> {
         let cipher = Box::new(AesGcm256::init()?);

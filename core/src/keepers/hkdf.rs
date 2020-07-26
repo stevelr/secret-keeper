@@ -7,7 +7,6 @@ use crate::{
         Cipher, CipherKind,
     },
     error::{Error, Result},
-    util,
 };
 use hmac::Hmac;
 use pbkdf2;
@@ -58,7 +57,7 @@ pub fn key_cipher_from_pass(
 /// to reduce risk of accidental logging or exposure.
 /// For purposes of this function, nonce can be arbitrary length.
 fn key_from_pass(passphrase: &str, nonce: &[u8]) -> Vec<u8> {
-    let mut derived = util::uninitialized_vec(KEYBYTES);
+    let mut derived = vec![0; KEYBYTES];
     let mut pass = String::from(CONTEXT);
     pass.push_str(passphrase);
     pbkdf2::pbkdf2::<Hmac<Sha256>>(&pass.as_bytes(), nonce, ROUNDS, &mut derived);

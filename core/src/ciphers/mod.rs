@@ -1,6 +1,8 @@
 //! Encryption ciphers
 
 mod cipher;
+#[cfg(feature = "fileio")]
+pub(crate) use cipher::read_file;
 pub use cipher::{Cipher, CipherKind, CompressingCipher, Import};
 
 pub mod macs;

@@ -8,7 +8,8 @@ use bytes::Bytes;
 // use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt;
 use strum_macros::{Display, EnumString};
-use tokio::fs::File;
+#[cfg(feature = "fileio")]
+use tokio::{fs::File, io::AsyncReadExt};
 
 /// Compressing cipher that compresses data before encrypting.
 #[async_trait]
@@ -54,6 +55,8 @@ pub trait Cipher: fmt::Debug + Sync + Send {
 
     /// Encrypt the file, with optional associated data.
     /// Return tuple has encrypted data, auth tag, and file size
+    /// (requires "fileio" feature)
+    #[cfg(feature = "fileio")]
     async fn seal_file(
         &self,
         file_path: &str,
@@ -61,7 +64,9 @@ pub trait Cipher: fmt::Debug + Sync + Send {
     ) -> Result<(Bytes, AuthTag, u64), Error>;
 
     /// Encrypt the data and write/append to the file. Returns the auth tag and length of data appended
-    /// data buf may be overwritten for encryption-in-place
+    /// data buf may be overwritten for encryption-in-place (requires "fileio" feature)
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn seal_write(
         &self,
         data: &mut [u8],
@@ -78,6 +83,8 @@ pub trait Cipher: fmt::Debug + Sync + Send {
     /// To reduce memory allocations, (particularly for compressing ciphers),
     /// caller should set size_hint to size of decompressed/decrypted data, if known.
     /// For non-compressing cipher such as xchacha20-poly1305, return Bytes.len() == len
+    /// (requires "fileio" feature, included in default)
+    #[cfg(feature = "fileio")]
     async fn open_read(
         &self,
         file: &mut File,
@@ -213,6 +220,19 @@ impl<'de> serde::de::Visitor<'de> for CipherKindVisitor {
             _ => Err(E::custom(format!("u8 is not a valid CipherKind id: {}", n))),
         }
     }
+}
+
+// Read exactly len bytes from file into a newly-allocated mutable buffer.
+// This function is isolated here and is the only use of 'unsafe' in non-test code in this crate.
+// 'unsafe' is safe here because this function never returns any uninitialized data
+#[cfg(feature = "fileio")]
+pub async fn read_file(file: &mut File, len: usize) -> Result<bytes::BytesMut, Error> {
+    let mut buf = bytes::BytesMut::with_capacity(len);
+    unsafe {
+        buf.set_len(len);
+    }
+    let _ = file.read_exact(&mut buf.as_mut()).await?;
+    Ok(buf)
 }
 
 #[cfg(test)]
